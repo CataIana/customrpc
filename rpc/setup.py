@@ -1,16 +1,20 @@
 from cx_Freeze import setup, Executable
-from os import listdir, remove
+from os import listdir, remove, getcwd, path
 from shutil import rmtree as rmdir
 from shutil import move
 from subprocess import Popen, PIPE
 from time import sleep
+from sys import platform
 
 exe_name = "rpc"
 py_file = "main.py"
-donotremove = [py_file, "customrpc.py", "config.json", "setup.py", "icon.ico"]
+donotremove = [
+    py_file,
+    "customrpc.py",
+    "config.json",
+    path.basename(__file__)
+]
 output = Popen(["taskkill", "/im", f"{exe_name}.exe", "/f"], stdout=PIPE)
-# for line in output.stdout:
-#     print(line)
 sleep(1)
 
 for file in listdir():
@@ -19,19 +23,18 @@ for file in listdir():
             remove(file)
         except PermissionError:
             rmdir(file)
-# Dependencies are automatically detected, but it might need
-# fine tuning.
+
+
 buildOptions = dict(packages = [], excludes = [], includes=[], include_files=[])
 
-import sys
-base = 'Win32GUI' if sys.platform=='win32' else None
+base = 'Win32GUI' if platform=='win32' else None
 
 executables = [
     Executable(
         py_file,
         base = base,
         targetName = exe_name,
-        icon = "icon.ico"
+        icon = "\\".join(getcwd().split('\\')[:-1] + ["\\icon.ico"])
     )
 ]
 

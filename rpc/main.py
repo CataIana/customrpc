@@ -2,7 +2,7 @@ import logging
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QComboBox, QLineEdit, QWidget, QCompleter, QSystemTrayIcon, QMenu
 from PyQt5.QtCore import Qt, QThread, QEvent
 from PyQt5.QtGui import QPalette, QColor, QIcon, QFont
-from os import getcwd
+from os import getcwd, path
 from subprocess import Popen, PIPE
 from json import load as j_load
 from json import dumps as j_print
@@ -18,7 +18,10 @@ class MainWindow(QMainWindow):
         kwargs.pop("runRPC")
         super(MainWindow, self).__init__(*args, **kwargs)
         self.log = logging.getLogger("RPC UI")
-        logging.basicConfig(level="INFO")
+        logging.basicConfig(level="DEBUG")
+        fh = logging.FileHandler('log.log')
+        fh.setLevel(logging.DEBUG)
+        self.log.addHandler(fh)
         self.log.info("Starting...")
         if runRPC:
             self.initRPC()
@@ -27,7 +30,7 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(qdarkstyle.load_stylesheet())
         #self.setAutoFillBackground(True)
 
-        self.trayIcon = QSystemTrayIcon(QIcon("icon.ico"), self)
+        self.trayIcon = QSystemTrayIcon(QIcon("\\".join(getcwd().split('\\')[:-1] + ["\\icon.ico"])), self)
         self.trayIcon.activated.connect(self.trayClicked)
         self.trayIcon.setToolTip("Chickenzzz CustomRPC")
         menu = QMenu()
@@ -35,7 +38,7 @@ class MainWindow(QMainWindow):
         exitAction = menu.addAction("Exit", self.exit)
         self.trayIcon.setContextMenu(menu)
 
-        self.setWindowIcon(QIcon(f"{getcwd()}/icon.ico"))
+        self.setWindowIcon(QIcon("\\".join(getcwd().split('\\')[:-1] + ["\\icon.ico"])))
 
         layout = QVBoxLayout()
         title = QVBoxLayout()
@@ -247,7 +250,7 @@ class MainWindow(QMainWindow):
     def exit(self):
         self.trayIcon.hide()
         self.hide()
-        self.exit()
+        exit()
 
     def settings(self):
         self.show()

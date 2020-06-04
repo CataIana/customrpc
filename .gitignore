@@ -1,4 +1,4 @@
-__pycache
+__pycache__
 *pyc
 *pyo
 */lib
@@ -6,6 +6,5 @@ __pycache
 */*.exe
 rainmeter skin/@Resources/images/coverWeb.png
 rainmeter skin/@Resources/music.txt
-data/analytics.xlsx
-data/gamelist.json
-data/inclusions.ini
+data/*
+*/*.log

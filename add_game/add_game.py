@@ -9,21 +9,6 @@ from json import load as j_load
 from json import dumps as j_print
 import qdarkstyle
 
-#from PyQt5.QtCore import pyqtSignal
-# class MyCompleter(QCompleter):
-#     insertText = pyqtSignal(str)
-
-# def __init__(self, parent=None):
-#     QCompleter.__init__(self, ["test","foo","bar"], parent)
-#     self.setCompletionMode(QCompleter.PopupCompletion)
-#     self.highlighted.connect(self.setHighlighted)
-
-# def setHighlighted(self, text):
-#     self.lastSelected = text
-
-# def getSelected(self):
-#     return self.lastSelected
-
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         self.log = logging.getLogger(__name__)
@@ -34,7 +19,7 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(qdarkstyle.load_stylesheet())
         #self.setAutoFillBackground(True)
 
-        self.setWindowIcon(QIcon(f"{getcwd()}/icon.ico"))
+        self.setWindowIcon(QIcon("\\".join(getcwd().split('\\')[:-1] + ["\\icon.ico"])))
         # palette = self.palette()
         # palette.setColor(QPalette.Window, QColor("white"))
         # self.setPalette(palette)
