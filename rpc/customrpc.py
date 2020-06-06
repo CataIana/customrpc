@@ -13,7 +13,7 @@ from json import dumps as j_print
 from requests import Session
 from bs4 import BeautifulSoup
 
-from logging import getLogger, basicConfig
+from logging import getLogger, basicConfig, FileHandler
 
 from traceback import format_exc
 from discord_webhook import DiscordWebhook
@@ -30,7 +30,7 @@ class CustomRPC(QObject):
     intReady = pyqtSignal(int)
     def __init__(self, client_id, **kwargs):
         self.log = getLogger("CustomRPC")
-        basicConfig(level="INFO")
+        basicConfig(level="DEBUG")
         super(CustomRPC, self).__init__()
         self.supported_platforms = ["win32"] #It's for personal use, I don't use linux anymore or macos
         if platform not in self.supported_platforms:
@@ -136,7 +136,7 @@ class CustomRPC(QObject):
             self.time_left = None
 
         programlist = {}
-        proc = Popen('WMIC PROCESS get Caption, ProcessID', shell=True, stdout=PIPE) #Get running processes and process ids associated with them
+        proc = Popen(["WMIC", "PROCESS", "get", "Caption", ",", "ProcessID"], shell=True, stdout=PIPE) #Get running processes and process ids associated with them
         for line in proc.stdout:
             program = line.decode().rstrip().split()#Clean up line
             if len(program) > 0: #If line isn't blank
@@ -149,17 +149,21 @@ class CustomRPC(QObject):
                 gamelist = j_load(g) #Read the json gamelist into the json library
             for exe, realname in gamelist.items(): #Iterate through the gamelist and find a matching process that is running
                 if exe in list(programlist.keys()): #Checks through programlist's keys
-                    proc = Popen(f"powershell New-TimeSpan -Start (get-process -id {programlist[exe]}).StartTime", shell=True, stdout=PIPE) #If found, find how long that process has been running for
+                    proc = Popen(["powershell", f"New-TimeSpan -Start (get-process -id {programlist[exe]}).StartTime"], shell=True, stdout=PIPE) #If found, find how long that process has been running for
                     timeactive = []
                     for line in proc.stdout:
                         timeactive.append(line.decode().rstrip().replace(" ", ""))
-                    timeactive = list(filter(None, timeactive)) #Forget what this does, looks important
-                    if timeactive[0] != "Days:0": #Some programs do not record how long they have been running for. Catch this and just say the game name
+                    timeactive_listed = list(filter(None, timeactive)) #Forget what this does, looks important
+                    if timeactive_listed[0] != "Days:0": #Some programs do not record how long they have been running for. Catch this and just say the game name
                         self.details = f"Playing {realname}"
                     else: #Otherwise...
                         d = {}
-                        for line in timeactive:
-                            d[line.split(":")[0]] = line.split(":")[1] #Convert the powershell output into a dictionary, due to its dict-like output
+                        for line in timeactive_listed:
+                            try:
+                                d[line.split(":")[0]] = line.split(":")[1] #Convert the powershell output into a dictionary, due to its dict-like output
+                            except IndexError:
+                                self.large_text = config["large_text"]
+                                return
                         if d["Hours"] == "0": #Don't bother displaying hours if its 0
                             if d["Minutes"] == "0": #For better looks, hide time for the first minute the process has been running for
                                 self.details = f"Playing {realname}" 
@@ -207,16 +211,12 @@ class CustomRPC(QObject):
         self.RPC.close()
         #self.finished.emit()
 
-    def readConfig(self):
+    def readConfig(self=None):
         with open(f"{getcwd()}/config.json") as f:
             return j_load(f)
 
-def readConfig():
-    with open(f"{getcwd()}/config.json") as f:
-        return j_load(f)
-
 if __name__ == "__main__":
-    config = readConfig()
+    config = CustomRPC.readConfig()
 
     rpc = CustomRPC(
         int(config["client_id"]),
@@ -226,33 +226,3 @@ if __name__ == "__main__":
     )
     while True:
         rpc.loop()
-
-    # def getStateLinux(self):
-    #     dbus = []
-    #     proc = Popen("""dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Get string:org.mpris.MediaPlayer2.Player string:Metadata""", shell=True, stdout=PIPE)
-    #     for line in proc.stdout:
-    #         dbus.append(line.decode().rstrip())
-
-    #     if len(dbus) != 0:
-    #         try:
-    #             details = f"""{dbus[40].split('"')[1]} - {dbus[27].split('"')[1]}"""
-    #         except IndexError:
-    #             details = default_details
-    #     else:
-    #         details = default_details
-
-    #     state = ""
-    #     proc = Popen("ps -ef | grep java", shell=True, stdout=PIPE)
-    #     for line in proc.stdout:
-    #         if "minecraft" in line.decode().rstrip():
-    #             state = "Playing Minecraft"
-        
-    #     if state != "Playing Minecraft":
-    #         #state = "Testing linux rpc yaya"
-    #         state = default_state
-
-    #     large_image = choice(image_list)
-
-    #     details = details[:128]
-
-    #     return state, details, large_image

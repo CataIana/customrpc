@@ -28,6 +28,8 @@ for file in listdir():
 buildOptions = dict(packages = [], excludes = [], includes=[], include_files=[])
 
 base = 'Win32GUI' if platform=='win32' else None
+#base = 'Win32Service' if platform=='win32' else None
+#base = "Console"
 
 executables = [
     Executable(

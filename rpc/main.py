@@ -3,10 +3,10 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBo
 from PyQt5.QtCore import Qt, QThread, QEvent
 from PyQt5.QtGui import QPalette, QColor, QIcon, QFont
 from os import getcwd, path
-from subprocess import Popen, PIPE
 from json import load as j_load
 from json import dumps as j_print
 import qdarkstyle
+from subprocess import Popen, PIPE
 from customrpc import CustomRPC
 from traceback import format_exc
 from discord_webhook import DiscordWebhook
@@ -17,12 +17,22 @@ class MainWindow(QMainWindow):
         runRPC = kwargs["runRPC"]
         kwargs.pop("runRPC")
         super(MainWindow, self).__init__(*args, **kwargs)
+
+        with open("log.log", "w"):
+            pass
         self.log = logging.getLogger("RPC UI")
-        logging.basicConfig(level="DEBUG")
-        fh = logging.FileHandler('log.log')
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(message)s",
+                              "%Y-%m-%d %H:%M:%S")
+        ch.setFormatter(formatter)
+        self.log.addHandler(ch)
+        self.log.setLevel(logging.DEBUG)
+        fh = logging.FileHandler("log.log")
         fh.setLevel(logging.DEBUG)
+        fh.setFormatter(formatter)
         self.log.addHandler(fh)
-        self.log.info("Starting...")
+    
         if runRPC:
             self.initRPC()
 
