@@ -2,7 +2,7 @@ import logging
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QComboBox, QLineEdit, QWidget, QCompleter, QSystemTrayIcon, QMenu
 from PyQt5.QtCore import Qt, QThread, QEvent
 from PyQt5.QtGui import QPalette, QColor, QIcon, QFont
-from os import getcwd, path
+from os import path, getcwd
 from json import load as j_load
 from json import dumps as j_print
 import qdarkstyle
@@ -17,18 +17,22 @@ class MainWindow(QMainWindow):
         runRPC = kwargs["runRPC"]
         kwargs.pop("runRPC")
         super(MainWindow, self).__init__(*args, **kwargs)
+        try:
+            self.root = path.dirname(path.realpath(__file__))
+        except NameError:
+            self.root = getcwd()
 
-        with open("log.log", "w"):
+        with open(f"{self.root}\\log.log", "w"):
             pass
         self.log = logging.getLogger("RPC UI")
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
         formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(message)s",
-                              "%Y-%m-%d %H:%M:%S")
+                              "%Y-%m-%d %I:%M:%S %p")
         ch.setFormatter(formatter)
         self.log.addHandler(ch)
         self.log.setLevel(logging.DEBUG)
-        fh = logging.FileHandler("log.log")
+        fh = logging.FileHandler(f"{self.root}\\log.log")
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(formatter)
         self.log.addHandler(fh)
@@ -40,15 +44,17 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(qdarkstyle.load_stylesheet())
         #self.setAutoFillBackground(True)
 
-        self.trayIcon = QSystemTrayIcon(QIcon("\\".join(getcwd().split('\\')[:-1] + ["\\icon.ico"])), self)
+        self.icondir = f"{self.root}\\..\\icon.ico"
+
+        self.trayIcon = QSystemTrayIcon(QIcon(self.icondir), self)
         self.trayIcon.activated.connect(self.trayClicked)
-        self.trayIcon.setToolTip("Chickenzzz CustomRPC")
+        self.trayIcon.setToolTip("CustomRPC")
         menu = QMenu()
         openSettingsAction = menu.addAction("Settings", self.settings)
         exitAction = menu.addAction("Exit", self.exit)
         self.trayIcon.setContextMenu(menu)
 
-        self.setWindowIcon(QIcon("\\".join(getcwd().split('\\')[:-1] + ["\\icon.ico"])))
+        self.setWindowIcon(QIcon(self.icondir))
 
         layout = QVBoxLayout()
         title = QVBoxLayout()
@@ -236,11 +242,11 @@ class MainWindow(QMainWindow):
             self.updateConfig(config)
         
     def updateConfig(self, config):
-        with open(f"{getcwd()}\\config.json", "w") as f:
+        with open(f"{self.root}\\config.json", "w") as f:
             f.write(j_print(config, indent=4))
 
     def readConfig(self):
-        with open(f"{getcwd()}\\config.json") as f:
+        with open(f"{self.root}\\config.json") as f:
             return j_load(f)
 
     # def restartRPC(self):

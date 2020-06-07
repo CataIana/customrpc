@@ -1,7 +1,7 @@
 from subprocess import Popen, PIPE
 from json import dumps as j_print
 from json import load as j_load
-from os import getcwd
+from os import path, getcwd
 from signal import signal, SIGINT, SIGTERM
 from traceback import format_exc
 from discord_webhook import DiscordEmbed
@@ -10,22 +10,25 @@ from time import sleep
 
 class RPCHourCount():
     def __init__(self):
-        self.root = "\\".join(getcwd().split('\\')[:-1])
-        self.music_file = f"{self.root}\\rainmeter skin\\@Resources\\music.txt"
+        try:
+            self.root = path.dirname(path.realpath(__file__))
+        except NameError:
+            self.root = getcwd()
+        self.music_file = f"{self.root}\\..\\rainmeter skin\\@Resources\\music.txt"
         self.open_processes = {}
         self.exclusions = ["svchost.exe"]
 
-        with open("spam.log", "w"):
+        with open(f"{self.root}\\spam.log", "w"):
             pass
         self.log = logging.getLogger("Hourcounter")
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
         formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(message)s",
-                              "%Y-%m-%d %H:%M:%S")
+                              "%Y-%m-%d %I:%M:%S %p")
         ch.setFormatter(formatter)
         self.log.addHandler(ch)
         self.log.setLevel(logging.DEBUG)
-        fh = logging.FileHandler("spam.log")
+        fh = logging.FileHandler(f"{self.root}\\spam.log")
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(formatter)
         self.log.addHandler(fh)
@@ -36,15 +39,15 @@ class RPCHourCount():
 
     def add_to_database(self, **kwargs):
         realname, totalhrs = kwargs["realname"], kwargs["totalhrs"]
-        with open(f"{getcwd()}\\..\\data\\hourcount.json") as g:
+        with open(f"{self.root}\\..\\data\\hourcount.json") as g:
             hourcount = j_load(g)
         if realname in hourcount.keys():
             hourcount[realname] += float(totalhrs)
-            with open(f"{getcwd()}\\..\\data\\hourcount.json", "w") as g:
+            with open(f"{self.root}\\..\\data\\hourcount.json", "w") as g:
                 g.write(j_print(hourcount, indent=4))
         else:
             hourcount[realname] = float(totalhrs)
-            with open(f"{getcwd()}\\..\\data\\hourcount.json", "w") as g:
+            with open(f"{self.root}\\..\\data\\hourcount.json", "w") as g:
                 g.write(j_print(hourcount, indent=4))
 
     def active_dict(self, pid):
@@ -65,7 +68,7 @@ class RPCHourCount():
         toremove = []
         for active_process in self.open_processes:
             if active_process not in self.programlist.keys():
-                with open(f"{self.root}\\data\\gamelist.json") as e:
+                with open(f"{self.root}\\..\\data\\gamelist.json") as e:
                     gamelist = j_load(e)
                 for x, y in gamelist.items():
                     if x == active_process:
@@ -86,7 +89,7 @@ class RPCHourCount():
                 if program[0] not in self.exclusions: #If process isn't in exclusions list
                     self.programlist[program[0]] = program[1] #Add process and process id to dictionary
 
-        with open(f"{self.root}\\data\\gamelist.json") as e:
+        with open(f"{self.root}\\..\\data\\gamelist.json") as e:
             inclusions = j_load(e)
 
         for exe in inclusions.keys():

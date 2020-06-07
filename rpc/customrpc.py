@@ -5,7 +5,7 @@ from time import sleep, time
 from random import choice
 
 from sys import platform, stdout
-from os import getcwd, environ
+from os import environ, path, getcwd
 from subprocess import Popen, PIPE
 from json import load as j_load
 from json import dumps as j_print
@@ -44,6 +44,11 @@ class CustomRPC(QObject):
         self.exclusions = ["svchost.exe"] #Clean up program list. Kinda uncessary but probably saves ram.
         self.image_list = ["kitty", "chicken", "chickies", "chub",  "kitty2", "kitty3", "kitty4", "sleepy", "kitty5", "kitty6", "kitty7"] #The images available to the script
         self.music_file = f"{environ['USERPROFILE']}/Documents/Rainmeter/Skins/Chickenzzz Music Status/@Resources/music.txt" #Where to find the music.txt that rainmeter outputs
+
+        try:
+            self.root = icon = path.dirname(path.realpath(__file__))
+        except NameError:
+            self.root = getcwd()
 
         self.log.info(f"{bcolors.WARNING}Connecting...{bcolors.ENDC}")
         #print(f"{bcolors.WARNING}Connecting...{bcolors.ENDC}", end="\r")
@@ -115,7 +120,7 @@ class CustomRPC(QObject):
                 self.reconnect()
 
     def getVariables(self):
-        with open("config.json") as f:
+        with open(f"{self.root}\\config.json") as f:
             config = j_load(f)
         if config["enable_media"] == "True":
             with open(self.music_file) as f:
@@ -145,7 +150,7 @@ class CustomRPC(QObject):
 
         if config["enable_games"] == "True":
             self.details = config["default_details"] #Below code doesn't change anything if no process in gamelist is running. Wasn't an issue when not using OOP. Simplest fix, rather than making a boolean or similar
-            with open(f"{getcwd()}\\..\\data\\gamelist.json") as g:
+            with open(f"{self.root}\\..\\data\\gamelist.json") as g:
                 gamelist = j_load(g) #Read the json gamelist into the json library
             for exe, realname in gamelist.items(): #Iterate through the gamelist and find a matching process that is running
                 if exe in list(programlist.keys()): #Checks through programlist's keys
@@ -212,7 +217,7 @@ class CustomRPC(QObject):
         #self.finished.emit()
 
     def readConfig(self=None):
-        with open(f"{getcwd()}/config.json") as f:
+        with open(f"{self.root}\\config.json") as f:
             return j_load(f)
 
 if __name__ == "__main__":

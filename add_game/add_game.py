@@ -3,7 +3,7 @@ import logging
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QComboBox, QLineEdit, QWidget, QCompleter
 from PyQt5.QtCore import Qt, QFile, QTextStream
 from PyQt5.QtGui import QPalette, QColor, QIcon, QFont
-from os import getcwd
+from os import path, getcwd
 from subprocess import Popen, PIPE
 from json import load as j_load
 from json import dumps as j_print
@@ -11,15 +11,19 @@ import qdarkstyle
 
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
-        self.log = logging.getLogger(__name__)
+        self.log = logging.getLogger("RPC Add Game")
         logging.basicConfig(level="INFO")
         self.log.info("Starting...")
         super(MainWindow, self).__init__(*args, **kwargs)
         self.setWindowTitle("RPC Add Game")
         self.setStyleSheet(qdarkstyle.load_stylesheet())
         #self.setAutoFillBackground(True)
+        try:
+            self.root = path.dirname(path.realpath(__file__))
+        except NameError:
+            self.root = getcwd()
 
-        self.setWindowIcon(QIcon("\\".join(getcwd().split('\\')[:-1] + ["\\icon.ico"])))
+        self.setWindowIcon(QIcon(f"{self.root}\\..\\icon.ico"))
         # palette = self.palette()
         # palette.setColor(QPalette.Window, QColor("white"))
         # self.setPalette(palette)
@@ -102,6 +106,7 @@ class MainWindow(QMainWindow):
             if len(a) > 0:
                 if a not in exclusions:
                     programlist.append(a)
+        programlist = list(dict.fromkeys(programlist))
         self.programList.addItems(sorted(programlist, key=str.casefold))
 
     def checkExists(self, index):
@@ -112,15 +117,13 @@ class MainWindow(QMainWindow):
             self.log.info("Blank selected. Disabling button")
         else:
             self.chosen = self.programList.itemText(index)
-            with open(f"{getcwd()}\\..\\data\\gamelist.json") as ga:
+            with open(f"{self.root}\\..\\data\\gamelist.json") as ga:
                 gamelist = j_load(ga)
             if self.chosen in list(gamelist.keys()):
-                #self.add_button.configure(state="disabled")
                 self.infoLabel.setText("Executable already defined!")
                 self.addProgramButton.setEnabled(False)
                 self.log.info("Already defined game selected. Disabling button")
             else:
-                #self.add_button.configure(state="normal")
                 self.addProgramButton.setEnabled(True)
                 self.infoLabel.setText("")
                 self.log.info("Undefined game selected. Enabling button")
@@ -130,26 +133,20 @@ class MainWindow(QMainWindow):
         realname = self.realNameInput.text()
         if self.chosen != "" and realname != "":
             self.infoLabel.setText(f"Adding {self.chosen}...")
-            with open(f"{getcwd()}\\..\\data\\gamelist.json") as ga:
+            with open(f"{self.root}\\..\\data\\gamelist.json") as ga:
                 gamelist = j_load(ga)
             gamelist[self.chosen] = realname
-            with open(f"{getcwd()}\\..\\data\\gamelist.json", "w") as gw:
+            with open(f"{self.root}\\..\\data\\gamelist.json", "w") as gw:
                 gw.write(j_print(gamelist, indent=4))
             self.infoLabel.setText("Done!")
             self.log.info(f"Successfully added {self.chosen} to game list under {realname}")
-            #self.window.after(1000, lambda: self.info_label.configure(text=""))
         else:
             self.infoLabel.setText("Fill out all boxes!")
             self.log.info("Realname box empty")
-            #self.window.after(1000, lambda: self.info_label.configure(text=""))
     
     def showGameList(self):
         self.log.info("Showing game list")
-        cwd = getcwd().split("\\")
-        del cwd[-1]
-        cwd.append("data")
-        cwd.append("gamelist.json")
-        folder = "\\\\".join(cwd)
+        folder = f"{self.root}\\..\\data\\gamelist.json"
         Popen(f"start {folder}", shell=True)
 
 

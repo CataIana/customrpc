@@ -1,5 +1,5 @@
 from cx_Freeze import setup, Executable
-from os import listdir, remove, getcwd, path
+from os import listdir, remove, path
 from shutil import rmtree as rmdir
 from shutil import move
 from subprocess import Popen, PIPE
@@ -15,13 +15,12 @@ donotremove = [
 output = Popen(["taskkill", "/im", f"{exe_name}.exe", "/f"], stdout=PIPE)
 sleep(1)
 
-for file in listdir():
+for file in listdir(path.dirname(path.realpath(__file__))):
     if file not in donotremove:
         try:
-            remove(file)
+            remove(f"{path.dirname(path.realpath(__file__))}\\{file}")
         except PermissionError:
-            rmdir(file)
-
+            rmdir(f"{path.dirname(path.realpath(__file__))}\\{file}")
 
 buildOptions = dict(packages = [], excludes = [])
 
@@ -32,7 +31,7 @@ executables = [
         py_file,
         base = base,
         targetName = exe_name,
-        icon = "\\".join(getcwd().split('\\')[:-1] + ["\\icon.ico"])
+        icon = f"{path.dirname(path.realpath(__file__))}\\..\\icon.ico"
     )
 ]
 
@@ -42,7 +41,7 @@ setup(name='RPCAddGame',
       options = dict(build_exe = buildOptions),
       executables = executables)
 
-builddir = listdir("build")[0]
-for file in listdir(f"build/{builddir}"):
-    move(f"build/{builddir}/{file}", file)
-rmdir("build")
+builddir = listdir(f"{path.dirname(path.realpath(__file__))}\\build")[0]
+for file in listdir(f"{path.dirname(path.realpath(__file__))}\\build\\{builddir}"):
+    move(f"{path.dirname(path.realpath(__file__))}\\build\\{builddir}\\{file}", file)
+rmdir(f"{path.dirname(path.realpath(__file__))}\\build")
