@@ -10,7 +10,7 @@ exe_name = "rpc"
 py_file = "main.py"
 donotremove = [
     py_file,
-    "customrpc.py",
+    "customrpc",
     "config.json",
     path.basename(__file__)
 ]
