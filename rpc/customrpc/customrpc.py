@@ -45,10 +45,11 @@ class CustomRPC(QObject):
         self.image_list = ["kitty", "chicken", "chickies", "chub",  "kitty2", "kitty3", "kitty4", "sleepy", "kitty5", "kitty6", "kitty7"] #The images available to the script
         self.music_file = f"{environ['USERPROFILE']}/Documents/Rainmeter/Skins/Chickenzzz Music Status/@Resources/music.txt" #Where to find the music.txt that rainmeter outputs
 
-        try:
-            self.root = icon = path.dirname(path.realpath(__file__))
-        except NameError:
-            self.root = getcwd()
+        #try:
+        #    self.root = icon = path.dirname(path.realpath(__file__))
+        #except NameError:
+        #
+        self.root = getcwd()
 
         self.log.info(f"{bcolors.WARNING}Connecting...{bcolors.ENDC}")
         #print(f"{bcolors.WARNING}Connecting...{bcolors.ENDC}", end="\r")
