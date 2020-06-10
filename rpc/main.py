@@ -2,7 +2,7 @@ import logging
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QComboBox, QLineEdit, QWidget, QCompleter, QSystemTrayIcon, QMenu
 from PyQt5.QtCore import Qt, QThread, QEvent
 from PyQt5.QtGui import QPalette, QColor, QIcon, QFont
-from os import path, getcwd
+from os import path, getcwd, getpid, environ, remove
 from json import load as j_load
 from json import dumps as j_print
 import qdarkstyle
@@ -10,7 +10,7 @@ from subprocess import Popen, PIPE
 from customrpc import CustomRPC
 from traceback import format_exc
 from discord_webhook import DiscordWebhook
-from sys import argv
+from sys import argv, exit
 
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -36,6 +36,20 @@ class MainWindow(QMainWindow):
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(formatter)
         self.log.addHandler(fh)
+
+        if path.isfile(f"{environ['USERPROFILE']}\\rpc.pid"):
+            with open(f"{environ['USERPROFILE']}\\rpc.pid") as f:
+                pid = f.read()
+            proc = Popen(["WMIC", "PROCESS", "get", "ProcessID"], shell=True, stdout=PIPE)
+            if pid in str(proc.stdout.read()):
+                self.log.critical(f"Already running! ({pid})")
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(None, "Already Running!", "RPC", 0x10)
+                exit()
+
+        with open(f"{environ['USERPROFILE']}\\rpc.pid", "w") as p:
+            p.write(str(getpid()))
+            self.log.debug(f"PID: {getpid()}")
     
         if runRPC:
             self.initRPC()
@@ -266,6 +280,7 @@ class MainWindow(QMainWindow):
     def exit(self):
         self.trayIcon.hide()
         self.hide()
+        remove(f"{environ['USERPROFILE']}\\rpc.pid")
         exit()
 
     def settings(self):

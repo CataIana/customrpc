@@ -37,7 +37,7 @@ executables = [
 ]
 
 setup(name='RPC Hour Counter',
-      version = '1.0',
+      version = '1.4',
       description = 'RPC Hour Counter',
       options = dict(build_exe = buildOptions),
       executables = executables)

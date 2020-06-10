@@ -93,10 +93,10 @@ class CustomRPC(QObject):
     def loop(self):
         while __name__ != "__main__":
             try:
-                prev_state, prev_details, prev_large_text = self.state, self.details, self.large_text #Store previous state/details
+                prev_state, prev_details, prev_large_text, prev_time_left = self.state, self.details, self.large_text, self.time_left #Store previous state/details
                 self.getVariables() #Get variables
                 f = True
-                while self.state == prev_state and self.details == prev_details and self.large_text == prev_large_text: #If variables haven't changed don't bother sending requests to discord.
+                while self.state == prev_state and self.details == prev_details and self.large_text == prev_large_text and self.time_left == prev_time_left: #If variables haven't changed don't bother sending requests to discord.
                     if f:
                         self.log.info("Waiting for update")
                         f = False

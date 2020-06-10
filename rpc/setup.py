@@ -40,7 +40,7 @@ executables = [
 ]
 
 setup(name='CustomRPC',
-      version = '3.0',
+      version = '3.1',
       description = 'RPC',
       options = dict(build_exe = buildOptions),
       executables = executables)

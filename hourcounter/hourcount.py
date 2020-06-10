@@ -1,12 +1,13 @@
 from subprocess import Popen, PIPE
 from json import dumps as j_print
 from json import load as j_load
-from os import path, getcwd
+from os import path, getcwd, environ, getpid, remove
 from signal import signal, SIGINT, SIGTERM
 from traceback import format_exc
 from discord_webhook import DiscordEmbed
 import logging
 from time import sleep
+from sys import exit
 
 class RPCHourCount():
     def __init__(self):
@@ -32,6 +33,20 @@ class RPCHourCount():
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(formatter)
         self.log.addHandler(fh)
+
+        if path.isfile(f"{environ['USERPROFILE']}\\hourcount.pid"):
+            with open(f"{environ['USERPROFILE']}\\hourcount.pid") as f:
+                pid = f.read()
+            proc = Popen(["WMIC", "PROCESS", "get", "ProcessID"], shell=True, stdout=PIPE)
+            if pid in str(proc.stdout.read()):
+                self.log.critical(f"Already running! ({pid})")
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(None, "Already Running!", "Hourcount", 0x10)
+                exit()
+
+        with open(f"{environ['USERPROFILE']}\\hourcount.pid", "w") as p:
+            p.write(str(getpid()))
+            self.log.debug(f"PID: {getpid()}")
     
         self.is_running = True
         signal(SIGINT, self.stop)
@@ -55,8 +70,12 @@ class RPCHourCount():
         timeactive = []
         for line in proc.stdout:
             timeactive.append(line.decode().rstrip().replace(" ", ""))
-        if timeactive[0] == f"get-process:Cannotfindaprocesswiththeprocessidentifier{pid}.":
-            return "None"
+        try:
+            if timeactive[0] == f"get-process:Cannotfindaprocesswiththeprocessidentifier{pid}.":
+                return "None"
+        except IndexError as e:
+            self.log.critical(e)
+            self.log.critical(str(timeactive))
         d = {}
         for line in list(filter(None, timeactive)):
             d[line.split(":")[0]] = line.split(":")[1]
@@ -131,3 +150,4 @@ hourcount = RPCHourCount()
 while hourcount.is_running:
     sleep(5)
     hourcount.close_loop()
+remove(f"{environ['USERPROFILE']}\\hourcount.pid")
