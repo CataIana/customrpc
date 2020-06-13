@@ -11,6 +11,7 @@ from json import load as j_load
 from json import dumps as j_print
 
 from requests import Session
+from requests.exceptions import ConnectionError
 from bs4 import BeautifulSoup
 
 from logging import getLogger, basicConfig, FileHandler
@@ -129,25 +130,33 @@ class CustomRPC(QObject):
             try:
                 if music_read[1] == "1": #The second line has a 1 in it if music is playing, 0 if paused, and 3 if stopped. Rainmeter/Luas/Webnowplayings choice I dont pick
                     self.state = music_read[0] #Set details to currently playing song
-                    duration = int(music_read[3].split(":")[0]) * 60 + int(music_read[3].split(":")[1])
-                    position = int(music_read[2].split(":")[0]) * 60 + int(music_read[2].split(":")[1])
+                    duration_read = music_read[3].split(":")[::-1] #Read time into list with each item being hour/minute/second
+                    position_read = music_read[2].split(":")[::-1]
+                    duration = 0
+                    position = 0
+                    for i in range(len(duration_read)-1, -1, -1): #Smart loop to convert times from hour/minutes to seconds. Fully expandable, so works with any lengths
+                        duration += int(duration_read[i])*(60**i)
+                    for i in range(len(position_read)-1, -1, -1):
+                        position += int(position_read[i])*(60**i)
+                    #Calculate the difference between the 2 times and set time left to how long that is plus the current time
                     self.time_left = time() + (duration - position)
                 else:
                     self.state = config["default_state"] #If music is not playing let details be the default setting
                     self.time_left = None
             except IndexError: #Rainmeter rewrites to the music.txt file multiple times per second, and python may catch the text file with nothing in it.
-                pass #Prevents errors that may occur every few hours
+                pass #Prevents errors that may occur every few hours. Holy shit this took a long time to diagnose
         else:
-            self.state = config["default_state"]
-            self.time_left = None
+            self.state = config["default_state"] #If user disabled showing media, let state be default
+            self.time_left = None #When setting state, always set time_left
 
-        programlist = {}
-        proc = Popen(["WMIC", "PROCESS", "get", "Caption", ",", "ProcessID"], shell=True, stdout=PIPE) #Get running processes and process ids associated with them
-        for line in proc.stdout:
-            program = line.decode().rstrip().split()#Clean up line
-            if len(program) > 0: #If line isn't blank
-                if program[0] not in self.exclusions: #If process isn't in exclusions list
-                    programlist[program[0]] = program[1] #Add process and process id to dictionary
+        if config["enable_games"] == "True" or config["enable_media"] == "True":
+            programlist = {} #Program list is required for vlc detection, and it also required for game detection
+            proc = Popen(["WMIC", "PROCESS", "get", "Caption", ",", "ProcessID"], shell=True, stdout=PIPE) #Get running processes and process ids associated with them
+            for line in proc.stdout:
+                program = line.decode().rstrip().split()#Clean up line
+                if len(program) > 0: #If line isn't blank
+                    if program[0] not in self.exclusions: #If process isn't in exclusions list
+                        programlist[program[0]] = program[1] #Add process and process id to dictionary
 
         if config["enable_games"] == "True":
             self.details = config["default_details"] #Below code doesn't change anything if no process in gamelist is running. Wasn't an issue when not using OOP. Simplest fix, rather than making a boolean or similar
@@ -186,29 +195,40 @@ class CustomRPC(QObject):
         if config["enable_media"] == "True":
             if "vlc.exe" in programlist.keys(): #Check if vlc is running
                 s = Session() #Create a requests session.
-                s.auth = ('', '6254') #Login to vlc client. See https://www.howtogeek.com/117261/how-to-activate-vlcs-web-interface-control-vlc-from-a-browser-use-any-smartphone-as-a-remote/
-                r = s.get('http://localhost:8080/requests/status.xml', verify=False) #Authenticate the vlc web client
-                soup = BeautifulSoup(r.text, "lxml") #Do the BS4 magic
-                vlcstate = soup.find("state").contents[0] #Locate the state object to get if vlc is playing or not
-                if vlcstate == "playing": #Just like music, don't display if not playing
-                    vlctitle = None #Set to none so if statement after for loop doesn't error
-                    info = soup.findAll("info") #Finda ll info tags
-                    for x in info:
-                        if x["name"] == "title": #Find the title tag
-                            vlctitle = x.contents[0] #And set it to the vlc title.
-                            break
-                    if vlctitle == None: #For many files, there will be no titles, revert to filename instead, which will always exist
-                        for x in info:
-                            if x["name"] == "filename":
-                                vlctitle = x.contents[0]
-                                break
-                    self.details = f"Watching {vlctitle} on VLC"
-        else:
-            self.state = config["default_state"]
+                s.auth = ('', 'rpc') #Login to vlc client. See https://www.howtogeek.com/117261/how-to-activate-vlcs-web-interface-control-vlc-from-a-browser-use-any-smartphone-as-a-remote/
+                try:
+                    r = s.get('http://localhost:8080/requests/status.xml', verify=False) #Authenticate the vlc web client
+                except ConnectionError:
+                    if "ctypes" not in globals():
+                        import ctypes
+                        ctypes.windll.user32.MessageBoxW(None, "Unable to access VLC web interface!\nHave you activated the web interface?\nHave you allowed VLC through Windows Firewall?", "RPC", 0x10)
+                else:
+                    s.close()
+                    soup = BeautifulSoup(r.text, "lxml") #Do the BS4 magic
+                    title_error = soup.find("title")
+                    if title_error != None:
+                        if "ctypes" not in globals():
+                            import ctypes
+                            ctypes.windll.user32.MessageBoxW(None, "Unable to access VLC web interface!\nHave you set the password to 'rpc'?", "RPC", 0x10)
+                    else:
+                        vlcstate = soup.find("state").contents[0] #Locate the state object to get if vlc is playing or not
+                        if vlcstate == "playing": #Just like music, don't display if not playing
+                            vlctitle = None #Set to none so if statement after for loop doesn't error
+                            info = soup.findAll("info") #Finda ll info tags
+                            for x in info:
+                                if x["name"] == "title": #Find the title tag
+                                    vlctitle = x.contents[0] #And set it to the vlc title.
+                                    break
+                            if vlctitle == None: #For many files, there will be no titles, revert to filename instead, which will always exist
+                                for x in info:
+                                    if x["name"] == "filename":
+                                        vlctitle = x.contents[0]
+                                        break
+                            self.details = f"Watching {vlctitle} on VLC"
         
         self.details = self.details[:128] #Make sure both variables aren't more than 128 characters long.
         self.state = self.state[:128] #Discord limits to 128 characters. Not my choice
-        self.large_text = config["large_text"]
+        self.large_text = config["large_text"] #and set the large_text, the only one that is static
 
     #@pyqtSlot()
     def restart(self):
