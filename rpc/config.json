@@ -3,6 +3,7 @@
     "default_state": "  ",
     "default_details": "Bok Bok",
     "large_text": "Message me and I'll say congrats for finding this lol",
-    "enable_games": "True",
-    "enable_media": "True"
+    "enable_games": true,
+    "enable_media": true,
+    "use_time_left": true
 }

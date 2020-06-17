@@ -148,20 +148,26 @@ class MainWindow(QMainWindow):
         layout.addLayout(largeText)
 
         ##################################################################
-        if config["enable_games"] == "True":
+        if config["enable_games"] == True:
             self.disableGames = QPushButton("Disable Games")
         else:
             self.disableGames = QPushButton("Enable Games")
-        if config["enable_media"] == "True":
+        if config["enable_media"] == True:
             self.disableMedia = QPushButton("Disable Media")
         else:
             self.disableMedia = QPushButton("Enable Media")
+        if config["use_time_left"] == True:
+            self.timeFormat = QPushButton("Use Start Time")
+        else:
+            self.timeFormat = QPushButton("Use End Time")
 
         self.disableGames.clicked.connect(self.toggleGames)
         self.disableMedia.clicked.connect(self.toggleMedia)
+        self.timeFormat.clicked.connect(self.toggleTime)
 
         options.addWidget(self.disableGames)
         options.addWidget(self.disableMedia)
+        options.addWidget(self.timeFormat)
 
         layout.addLayout(options)
 
@@ -305,22 +311,32 @@ class MainWindow(QMainWindow):
 
     def toggleGames(self):
         config = self.readConfig()
-        if config["enable_games"] == "True":
+        if config["enable_games"] == True:
             self.disableGames.setText("Enable Games")
-            config["enable_games"] = "False"
-        elif config["enable_games"] == "False":
+            config["enable_games"] = False
+        elif config["enable_games"] == False:
             self.disableGames.setText("Disable Games")
-            config["enable_games"] = "True"
+            config["enable_games"] = True
         self.updateConfig(config)
 
     def toggleMedia(self):
         config = self.readConfig()
-        if config["enable_media"] == "True":
+        if config["enable_media"] == True:
             self.disableMedia.setText("Enable Media")
-            config["enable_media"] = "False"
-        elif config["enable_media"] == "False":
+            config["enable_media"] = False
+        elif config["enable_media"] == False:
             self.disableMedia.setText("Disable Media")
-            config["enable_media"] = "True"
+            config["enable_media"] = True
+        self.updateConfig(config)
+
+    def toggleTime(self):
+        config = self.readConfig()
+        if config["use_time_left"] == True:
+            self.timeFormat.setText("Use End Time")
+            config["use_time_left"] = False
+        elif config["use_time_left"] == False:
+            self.timeFormat.setText("Use Start Time")
+            config["use_time_left"] = True
         self.updateConfig(config)
 
 if __name__ == "__main__":
