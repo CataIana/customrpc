@@ -1,7 +1,7 @@
 import logging
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QComboBox, QLineEdit, QWidget, QCompleter, QSystemTrayIcon, QMenu
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QLineEdit, QWidget, QSystemTrayIcon, QMenu
 from PyQt5.QtCore import Qt, QThread, QEvent
-from PyQt5.QtGui import QPalette, QColor, QIcon, QFont
+from PyQt5.QtGui import QIcon, QFont
 from os import path, getcwd, getpid, environ, remove
 from json import load as j_load
 from json import dumps as j_print
@@ -27,8 +27,7 @@ class MainWindow(QMainWindow):
         self.log = logging.getLogger("RPC UI")
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
-        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(message)s",
-                              "%Y-%m-%d %I:%M:%S %p")
+        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(message)s", "%Y-%m-%d %I:%M:%S %p")
         ch.setFormatter(formatter)
         self.log.addHandler(ch)
         self.log.setLevel(logging.DEBUG)
@@ -64,8 +63,8 @@ class MainWindow(QMainWindow):
         self.trayIcon.activated.connect(self.trayClicked)
         self.trayIcon.setToolTip("CustomRPC")
         menu = QMenu()
-        openSettingsAction = menu.addAction("Settings", self.settings)
-        exitAction = menu.addAction("Exit", self.exit)
+        menu.addAction("Settings", self.settings)
+        menu.addAction("Exit", self.exit)
         self.trayIcon.setContextMenu(menu)
 
         self.setWindowIcon(QIcon(self.icondir))
@@ -149,20 +148,26 @@ class MainWindow(QMainWindow):
         layout.addLayout(largeText)
 
         ##################################################################
-        if config["enable_games"] == "True":
+        if config["enable_games"] == True:
             self.disableGames = QPushButton("Disable Games")
         else:
             self.disableGames = QPushButton("Enable Games")
-        if config["enable_media"] == "True":
+        if config["enable_media"] == True:
             self.disableMedia = QPushButton("Disable Media")
         else:
             self.disableMedia = QPushButton("Enable Media")
+        if config["use_time_left"] == True:
+            self.timeFormat = QPushButton("Use Start Time")
+        else:
+            self.timeFormat = QPushButton("Use End Time")
 
         self.disableGames.clicked.connect(self.toggleGames)
         self.disableMedia.clicked.connect(self.toggleMedia)
+        self.timeFormat.clicked.connect(self.toggleTime)
 
         options.addWidget(self.disableGames)
         options.addWidget(self.disableMedia)
+        options.addWidget(self.timeFormat)
 
         layout.addLayout(options)
 
@@ -175,7 +180,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(infoBox)
 
         widget = QWidget()
-        font = widget.setFont(QFont("Segoe UI", 12))
+        widget.setFont(QFont("Segoe UI", 12))
 
         widget.setLayout(layout)
         self.setCentralWidget(widget)
@@ -195,9 +200,9 @@ class MainWindow(QMainWindow):
             b = False
         else:
             config["client_id"] = int(new_clientID)
-            self.log.info(f"Set client ID to {config['client_id']}")
             result = f'Set client ID to "{config["client_id"]}"'
             b = True
+        self.log.info(result)
         if b:
             self.updateConfig(config)
 
@@ -276,7 +281,7 @@ class MainWindow(QMainWindow):
         #self.rpc.finished.connect(self.thread.quit)
         self.thread.started.connect(self.rpc.loop)
         self.thread.start()
-    
+
     def exit(self):
         self.trayIcon.hide()
         self.hide()
@@ -306,30 +311,43 @@ class MainWindow(QMainWindow):
 
     def toggleGames(self):
         config = self.readConfig()
-        if config["enable_games"] == "True":
+        if config["enable_games"] == True:
             self.disableGames.setText("Enable Games")
-            config["enable_games"] = "False"
-        elif config["enable_games"] == "False":
+            config["enable_games"] = False
+        elif config["enable_games"] == False:
             self.disableGames.setText("Disable Games")
-            config["enable_games"] = "True"
+            config["enable_games"] = True
         self.updateConfig(config)
 
     def toggleMedia(self):
         config = self.readConfig()
-        if config["enable_media"] == "True":
+        if config["enable_media"] == True:
             self.disableMedia.setText("Enable Media")
-            config["enable_media"] = "False"
-        elif config["enable_media"] == "False":
+            config["enable_media"] = False
+        elif config["enable_media"] == False:
             self.disableMedia.setText("Disable Media")
-            config["enable_media"] = "True"
+            config["enable_media"] = True
+        self.updateConfig(config)
+
+    def toggleTime(self):
+        config = self.readConfig()
+        if config["use_time_left"] == True:
+            self.timeFormat.setText("Use End Time")
+            config["use_time_left"] = False
+        elif config["use_time_left"] == False:
+            self.timeFormat.setText("Use Start Time")
+            config["use_time_left"] = True
         self.updateConfig(config)
 
 if __name__ == "__main__":
-    try:
-        app = QApplication(argv)
-        window = MainWindow(runRPC=True)
-        app.exec_()
-    except Exception:
-        print(format_exc())
-        webhook = DiscordWebhook(url='https://discordapp.com/api/webhooks/714899533213204571/Wa6iiaUBG9Y5jX7arc6-X7BYcY-0-dAjQDdSIQkZPpy_IPGT2NrNhAC_ibXSOEzHyKzz', content=format_exc())
-        response = webhook.execute()
+    # try:
+    #     app = QApplication(argv)
+    #     window = MainWindow(runRPC=True)
+    #     app.exec_()
+    # except Exception:
+    #     print(format_exc())
+    #     webhook = DiscordWebhook(url='https://discordapp.com/api/webhooks/714899533213204571/Wa6iiaUBG9Y5jX7arc6-X7BYcY-0-dAjQDdSIQkZPpy_IPGT2NrNhAC_ibXSOEzHyKzz', content=format_exc())
+    #     response = webhook.execute()
+    app = QApplication(argv)
+    window = MainWindow(runRPC=True)
+    app.exec_()
