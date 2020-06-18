@@ -39,12 +39,15 @@ class MainWindow(QMainWindow):
         if path.isfile(f"{environ['USERPROFILE']}\\rpc.pid"):
             with open(f"{environ['USERPROFILE']}\\rpc.pid") as f:
                 pid = f.read()
-            proc = Popen(["WMIC", "PROCESS", "get", "ProcessID"], shell=True, stdout=PIPE)
-            if pid in str(proc.stdout.read()):
-                self.log.critical(f"Already running! ({pid})")
-                import ctypes
-                ctypes.windll.user32.MessageBoxW(None, "Already Running!", "RPC", 0x10)
-                exit()
+            proc = Popen(["WMIC", "PROCESS", "get", "Caption", ",", "ProcessID"], shell=True, stdout=PIPE) #Get running processes and process ids associated with them
+            for line in proc.stdout:
+                program = line.decode().rstrip().split()
+                if program[1] == pid:
+                    if program[0] == "rpc.exe":
+                        self.log.critical(f"Already running! ({pid})")
+                        import ctypes
+                        ctypes.windll.user32.MessageBoxW(None, "Already Running!", "RPC", 0x10)
+                        exit()
 
         with open(f"{environ['USERPROFILE']}\\rpc.pid", "w") as p:
             p.write(str(getpid()))
