@@ -233,7 +233,7 @@ class CustomRPC(QObject):
 
         if config["enable_media"] == True:
             if "vlc.exe" in programlist.keys(): #Check if vlc is running
-                self.rSession.auth = ('', 'rpc') #Login to vlc client. See https://www.howtogeek.com/117261/how-to-activate-vlcs-web-interface-control-vlc-from-a-browser-use-any-smartphone-as-a-remote/
+                self.rSession.auth = ("", config["vlc_pwd"]) #Login to vlc client. See https://www.howtogeek.com/117261/how-to-activate-vlcs-web-interface-control-vlc-from-a-browser-use-any-smartphone-as-a-remote/
                 try:
                     r = self.rSession.get('http://localhost:8080/requests/status.xml', verify=False) #Authenticate the vlc web client
                 except ConnectionError:
@@ -290,7 +290,8 @@ def generateConfig():
         "large_text": "  ",
         "enable_games": True,
         "enable_media": True,
-        "use_time_left": True
+        "use_time_left": True,
+        "vlc_pwd": ""
     }
     if not path.isdir(f"{environ['LOCALAPPDATA']}\\customrpc"):
         mkdir(f"{environ['LOCALAPPDATA']}\\customrpc")

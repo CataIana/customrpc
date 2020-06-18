@@ -25,7 +25,7 @@ for file in listdir(path.dirname(path.realpath(__file__))):
 
 buildOptions = dict(packages = [], excludes = [], includes=[], include_files=[])
 
-base = 'Win32GUI' if platform=='win32' else None
+base = "Win32GUI" if platform == "win32" else None
 #base = 'Win32Service' if platform=='win32' else None
 #base = "Console"
 
@@ -38,9 +38,9 @@ executables = [
     )
 ]
 
-setup(name='CustomRPC',
-      version = '3.3',
-      description = 'RPC',
+setup(name="CustomRPC",
+      version = "3.4",
+      description = "RPC",
       options = dict(build_exe = buildOptions),
       executables = executables)
 

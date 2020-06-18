@@ -80,6 +80,7 @@ class MainWindow(QMainWindow):
         details = QHBoxLayout()
         largeText = QHBoxLayout()
         options = QHBoxLayout()
+        options2 = QHBoxLayout()
         infoBox = QHBoxLayout()
 
         config = self.readConfig()
@@ -177,6 +178,20 @@ class MainWindow(QMainWindow):
 
         ##################################################################
 
+        self.chgVLCPwd = QPushButton("VLC Password")
+        ph1 = QPushButton()
+        ph2 = QPushButton()
+
+        self.chgVLCPwd.clicked.connect(self.showVLCPwdWindow)
+
+        options2.addWidget(self.chgVLCPwd)
+        options2.addWidget(ph1)
+        options2.addWidget(ph2)
+
+        layout.addLayout(options2)
+
+        ##################################################################
+
         self.info = QLabel("")
 
         infoBox.addWidget(self.info)
@@ -267,6 +282,11 @@ class MainWindow(QMainWindow):
         self.info.setText(result)
         if b:
             self.updateConfig(config)
+
+    def showVLCPwdWindow(self):
+        self.log.info("Showing VLC password change dialog box")
+        self.VlcPwdWin = VLCPasswordWindow(self)
+        self.VlcPwdWin.show()
         
     def updateConfig(self, config):
         with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json", "w") as f:
@@ -285,7 +305,8 @@ class MainWindow(QMainWindow):
                 "large_text": "  ",
                 "enable_games": True,
                 "enable_media": True,
-                "use_time_left": True
+                "use_time_left": True,
+                "vlc_pwd": ""
             }
             if not path.isdir(f"{environ['LOCALAPPDATA']}\\customrpc"):
                 mkdir(f"{environ['LOCALAPPDATA']}\\customrpc")
@@ -372,6 +393,52 @@ class MainWindow(QMainWindow):
             config["use_time_left"] = True
         self.log.info(f"Toggled time format to {config['use_time_left']}")
         self.updateConfig(config)
+
+class VLCPasswordWindow(QMainWindow):
+    def __init__(self, parent):
+        super(VLCPasswordWindow, self).__init__()
+        self.parent = parent
+
+        self.setWindowTitle("Change VLC Password")
+        self.setStyleSheet(qdarkstyle.load_stylesheet())
+
+        self.setWindowIcon(QIcon(parent.icondir))
+
+        layout = QVBoxLayout()
+
+        config = self.parent.readConfig()
+
+        ##################################################################
+
+        titleLabel = QLabel("Change VLC Password")
+        titleLabel.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+
+        self.pwdInput = QLineEdit(config["vlc_pwd"])
+        self.pwdInput.setEchoMode(QLineEdit.Password)
+        self.pwdButton = QPushButton("Change Password")
+
+        self.pwdInput.returnPressed.connect(self.pwdButton.click)
+        self.pwdButton.clicked.connect(self.setPassword)
+
+        layout.addWidget(titleLabel)
+        layout.addWidget(self.pwdInput)
+        layout.addWidget(self.pwdButton)
+
+        widget = QWidget()
+        widget.setFont(QFont("Segoe UI", 12))
+        widget.setLayout(layout)
+        self.setCentralWidget(widget)
+        self.setFixedSize(300, 150)
+
+    def setPassword(self):
+        new_pwd = self.pwdInput.text()
+        config = self.parent.readConfig()
+        config["vlc_pwd"] = new_pwd
+        self.parent.updateConfig(config)
+        self.parent.log.info(f"Set VLC password to {config['vlc_pwd']}")
+        self.log.info("Closing VLC password change dialog box")
+        self.hide()
+
 
 if __name__ == "__main__":
     # try:
