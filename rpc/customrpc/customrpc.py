@@ -139,7 +139,7 @@ class CustomRPC(QObject):
             prev_state, prev_details, prev_large_text, prev_time_left = self.state, self.details, self.large_text, self.time_left #Store previous state/details
             self.getVariables() #Get variables
             f = True
-            while self.state == prev_state and self.details == prev_details and self.large_text == prev_large_text and self.time_left == prev_time_left: #If variables haven't changed don't bother sending requests to discord.
+            while self.state == prev_state and self.details == prev_details and self.large_text == prev_large_text and abs(self.time_left - prev_time_left) < 3: #If variables haven't changed don't bother sending requests to discord.
                 if f:
                     self.log.info("Waiting for update")
                     f = False
@@ -186,7 +186,7 @@ class CustomRPC(QObject):
                     if config["use_time_left"] == True:
                         self.time_left = time() + (duration - position)
                     else:
-                        self.time_left = time() - position
+                        self.time_left = int(time() - position)
                 else:
                     self.state = config["default_state"] #If music is not playing let details be the default setting
                     self.time_left = None
@@ -271,9 +271,9 @@ class CustomRPC(QObject):
                                         break
                             self.state = f"Watching {vlctitle} on VLC"
                             if config["use_time_left"] == True:
-                                self.time_left = time() + int(soup.find("time").text)
+                                self.time_left = int(time() + int(soup.find("time").text))
                             else:
-                                self.time_left = time() - int(soup.find("time").text)
+                                self.time_left = int(time() - int(soup.find("time").text))
         
         self.details = self.details[:128] #Make sure both variables aren't more than 128 characters long.
         self.state = self.state[:128] #Discord limits to 128 characters. Not my choice
