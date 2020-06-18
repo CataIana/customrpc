@@ -11,7 +11,6 @@ py_file = "main.py"
 donotremove = [
     py_file,
     "customrpc",
-    "config.json",
     path.basename(__file__)
 ]
 output = Popen(["taskkill", "/im", f"{exe_name}.exe", "/f"], stdout=PIPE)

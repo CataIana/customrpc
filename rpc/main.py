@@ -2,7 +2,7 @@ import logging
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QLineEdit, QWidget, QSystemTrayIcon, QMenu
 from PyQt5.QtCore import Qt, QThread, QEvent
 from PyQt5.QtGui import QIcon, QFont
-from os import path, getcwd, getpid, environ, remove
+from os import path, getcwd, getpid, environ, remove, mkdir
 from json import load as j_load
 from json import dumps as j_print
 import qdarkstyle
@@ -10,7 +10,8 @@ from subprocess import Popen, PIPE
 from customrpc import CustomRPC
 from traceback import format_exc
 from discord_webhook import DiscordWebhook
-from sys import argv, exit
+from sys import argv
+import sys
 
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -27,7 +28,7 @@ class MainWindow(QMainWindow):
         self.log = logging.getLogger("RPC UI")
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
-        formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(message)s", "%Y-%m-%d %I:%M:%S %p")
+        formatter = logging.Formatter("%(asctime)s: %(levelname)s: %(message)s", "%Y-%m-%d %I:%M:%S %p")
         ch.setFormatter(formatter)
         self.log.addHandler(ch)
         self.log.setLevel(logging.DEBUG)
@@ -42,12 +43,13 @@ class MainWindow(QMainWindow):
             proc = Popen(["WMIC", "PROCESS", "get", "Caption", ",", "ProcessID"], shell=True, stdout=PIPE) #Get running processes and process ids associated with them
             for line in proc.stdout:
                 program = line.decode().rstrip().split()
-                if program[1] == pid:
-                    if program[0] == "rpc.exe":
-                        self.log.critical(f"Already running! ({pid})")
-                        import ctypes
-                        ctypes.windll.user32.MessageBoxW(None, "Already Running!", "RPC", 0x10)
-                        exit()
+                if len(program) > 0:
+                    if program[1] == pid:
+                        if program[0] == "rpc.exe":
+                            self.log.critical(f"Already running! ({pid})")
+                            import ctypes
+                            ctypes.windll.user32.MessageBoxW(None, "Already Running!", "RPC", 0x10)
+                            sys.exit()
 
         with open(f"{environ['USERPROFILE']}\\rpc.pid", "w") as p:
             p.write(str(getpid()))
@@ -58,7 +60,6 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("RPC Settings")
         self.setStyleSheet(qdarkstyle.load_stylesheet())
-        #self.setAutoFillBackground(True)
 
         self.icondir = f"{self.root}\\..\\icon.ico"
 
@@ -196,6 +197,9 @@ class MainWindow(QMainWindow):
         if new_clientID == "":
             result = "Client ID cannot be empty!"
             b = False
+        if new_clientID.__len__() != 18:
+            result = "Client ID must be 18 digits!"
+            b = False
         try:
             int(new_clientID)
         except ValueError:
@@ -203,9 +207,10 @@ class MainWindow(QMainWindow):
             b = False
         else:
             config["client_id"] = int(new_clientID)
-            result = f'Set client ID to "{config["client_id"]}"'
+            result = f'Set client ID. Restart program to apply changes'
             b = True
-        self.log.info(result)
+        self.log.info(f'Set client ID to "{config["client_id"]}"')
+        self.info.setText(result)
         if b:
             self.updateConfig(config)
 
@@ -264,32 +269,55 @@ class MainWindow(QMainWindow):
             self.updateConfig(config)
         
     def updateConfig(self, config):
-        with open(f"{self.root}\\config.json", "w") as f:
+        with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json", "w") as f:
             f.write(j_print(config, indent=4))
 
     def readConfig(self):
-        with open(f"{self.root}\\config.json") as f:
-            return j_load(f)
-
-    # def restartRPC(self):
-    #     self.rpc.restart()
-    #     self.thread.quit
-    #     self.initRPC()
+        try:
+            with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f:
+                return j_load(f)
+        except FileNotFoundError:
+            self.log.error("Config not found! Generating...")
+            data = {
+                "client_id": "",
+                "default_state": "  ",
+                "default_details": "  ",
+                "large_text": "  ",
+                "enable_games": True,
+                "enable_media": True,
+                "use_time_left": True
+            }
+            if not path.isdir(f"{environ['LOCALAPPDATA']}\\customrpc"):
+                mkdir(f"{environ['LOCALAPPDATA']}\\customrpc")
+            with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json", "w") as f:
+                f.write(j_print(data, indent=4))
+            self.log.info("Sucessfully created config file.")
+            with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f:
+                return j_load(f)
 
     def initRPC(self):
         config = self.readConfig()
-        self.rpc = CustomRPC(int(config["client_id"]), state=config["default_state"], details=config["default_details"], large_text=config["large_text"])
-        self.thread = QThread()
-        self.rpc.moveToThread(self.thread)
-        #self.rpc.finished.connect(self.thread.quit)
-        self.thread.started.connect(self.rpc.loop)
-        self.thread.start()
+        try:
+            int(config["client_id"])
+        except ValueError:
+            self.log.critical("Client ID is not a valid integer!")
+            return
+        try:
+            self.rpc = CustomRPC(int(config["client_id"]), state=config["default_state"], details=config["default_details"], large_text=config["large_text"], log=self.log)
+        except TypeError:
+            pass
+        else:
+            self.thread = QThread()
+            self.rpc.moveToThread(self.thread)
+            #self.rpc.finished.connect(self.thread.quit)
+            self.thread.started.connect(self.rpc.loop)
+            self.thread.start()
 
     def exit(self):
         self.trayIcon.hide()
         self.hide()
         remove(f"{environ['USERPROFILE']}\\rpc.pid")
-        exit()
+        sys.exit()
 
     def settings(self):
         self.show()
@@ -307,7 +335,7 @@ class MainWindow(QMainWindow):
                 self.hide()
     
     def trayClicked(self, event):
-        self.log.info(f"Tray icon clicked. Event {event}")
+        self.log.debug(f"Tray icon clicked. Event {event}")
         if event == 3:
             self.show()
             self.activateWindow()
@@ -320,6 +348,7 @@ class MainWindow(QMainWindow):
         elif config["enable_games"] == False:
             self.disableGames.setText("Disable Games")
             config["enable_games"] = True
+        self.log.info(f"Toggled games to {config['enable_games']}")
         self.updateConfig(config)
 
     def toggleMedia(self):
@@ -330,6 +359,7 @@ class MainWindow(QMainWindow):
         elif config["enable_media"] == False:
             self.disableMedia.setText("Disable Media")
             config["enable_media"] = True
+        self.log.info(f"Toggled media to {config['enable_media']}")
         self.updateConfig(config)
 
     def toggleTime(self):
@@ -340,6 +370,7 @@ class MainWindow(QMainWindow):
         elif config["use_time_left"] == False:
             self.timeFormat.setText("Use Start Time")
             config["use_time_left"] = True
+        self.log.info(f"Toggled time format to {config['use_time_left']}")
         self.updateConfig(config)
 
 if __name__ == "__main__":

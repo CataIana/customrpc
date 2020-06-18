@@ -1,10 +1,12 @@
-from pypresence import Presence, InvalidPipe, InvalidID
+from pypresence import Presence
+from pypresence.exceptions import InvalidPipe, InvalidID, ServerError
 from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot
 
 from time import sleep, time
 from random import choice
 
 from sys import platform, stdout
+import sys
 from os import environ, path, getcwd
 from subprocess import Popen, PIPE
 from json import load as j_load
@@ -14,7 +16,7 @@ from requests import Session
 from requests.exceptions import ConnectionError
 from bs4 import BeautifulSoup
 
-from logging import getLogger, basicConfig, FileHandler
+import logging
 
 from traceback import format_exc
 from discord_webhook import DiscordWebhook
@@ -30,15 +32,23 @@ class CustomRPC(QObject):
     finished = pyqtSignal()
     intReady = pyqtSignal(int)
     def __init__(self, client_id, **kwargs):
-        self.log = getLogger("CustomRPC")
-        basicConfig(level="DEBUG")
+        if "log" in kwargs:
+            self.log = kwargs["log"]
+        else:
+            self.log = logging.getLogger("CustomRPC")
+            ch = logging.StreamHandler()
+            ch.setLevel(logging.DEBUG)
+            formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(message)s", "%Y-%m-%d %I:%M:%S %p")
+            ch.setFormatter(formatter)
+            self.log.addHandler(ch)
+            self.log.setLevel(logging.DEBUG)
+
         super(CustomRPC, self).__init__()
         self.supported_platforms = ["win32"] #It's for personal use, I don't use linux anymore or macos
         if platform not in self.supported_platforms:
             self.log.critical(f"{bcolors.FAIL}{bcolors.BOLD}Unrecognized Platform! ({platform}){bcolors.ENDC}") #Exit if not on windows
             exit()
         
-        self.log = getLogger(__name__)
         self.client_id = client_id
         self.RPC = Presence(self.client_id) #Init PyPresence, the magician behind the scenes
         self.time_left = None
@@ -46,11 +56,10 @@ class CustomRPC(QObject):
         self.image_list = ["kitty", "chicken", "chickies", "chub",  "kitty2", "kitty3", "kitty4", "sleepy", "kitty5", "kitty6", "kitty7"] #The images available to the script
         self.music_file = f"{environ['USERPROFILE']}/Documents/Rainmeter/Skins/Chickenzzz Music Status/@Resources/music.txt" #Where to find the music.txt that rainmeter outputs
 
-        #try:
-        #    self.root = path.dirname(path.realpath(__file__))
-        #except NameError:
-        #
-        self.root = getcwd()
+        try:
+           self.root = path.dirname(path.realpath(__file__))
+        except NameError:
+            self.root = getcwd()
 
         self.rSession = Session()
 
@@ -58,7 +67,13 @@ class CustomRPC(QObject):
 
         self.log.info(f"{bcolors.WARNING}Connecting...{bcolors.ENDC}")
         self.reconnect() #Initalize connection. Own function created to avoid errors if discord isn't open
-        self.updateRPC(False)
+        try:
+            self.updateRPC(False)
+        except ServerError:
+            self.log.critical("Client ID is invalid!")
+            raise TypeError(f"Client ID {self.client_id} is invalid")
+        except InvalidID:
+            self.updateRPC(False)
         #self.intReady.emit(1)
 
     def reconnect(self):
@@ -71,6 +86,8 @@ class CustomRPC(QObject):
                 self.log.error(f"{bcolors.FAIL}Cannot connect to discord! Is discord open? (Connection Refused){bcolors.ENDC}")
             except FileNotFoundError:
                 self.log.error(f"{bcolors.FAIL}Cannot connect to discord! Is discord open? (File Not Found){bcolors.ENDC}")
+            except InvalidID:
+                self.log.critical("This fixes the error, but this is never logged. I'm totally lost")
             else:
                 self.log.info(f"{bcolors.OKGREEN}Connected.{bcolors.ENDC}")
                 break
@@ -81,7 +98,7 @@ class CustomRPC(QObject):
         config = self.readConfig()
         if (self.lastUpdateTime + 15) > time() and self.lastUpdateTime != 0: #This is a workaround for at the start of the code execution. Because the __init__ of this needs to finish,
             initSleep = (self.lastUpdateTime + 15) - time() #before the UI part will start working we must skip the sleep, otherwise the program will not progress until that sleep completes. This is the use of the wait variable at the bottom of this function
-            self.log.info(f"Init sleeping for {initSleep}") #This loop is then put into action immediately after without waiting, which is an issue, as the RPC is set after about 2 seconds, which discord will accept, but it should only be set every 15 seconds
+            self.log.debug(f"Init sleeping for {initSleep}") #This loop is then put into action immediately after without waiting, which is an issue, as the RPC is set after about 2 seconds, which discord will accept, but it should only be set every 15 seconds
             sleep(initSleep) #This prevents that and should only run at the very start, or somehow the sleep(15) at the bottom of this function gets cut short. It will be logged for now to ensure this is the case
             self.getVariables() #Since it generally sleeps for about 14 seconds, get the variables again, just to be sure
 
@@ -137,7 +154,9 @@ class CustomRPC(QObject):
                 self.RPC.close()
                 sleep(2)
                 self.reconnect()
-                
+            except ServerError:
+                self.log.critical("Client ID is invalid!")
+                self.RPC.close()
 
     def getVariables(self):
         config = self.readConfig()
@@ -180,7 +199,7 @@ class CustomRPC(QObject):
 
         if config["enable_games"] == True:
             self.details = config["default_details"] #Below code doesn't change anything if no process in gamelist is running. Wasn't an issue when not using OOP. Simplest fix, rather than making a boolean or similar
-            with open(f"{self.root}\\..\\data\\gamelist.json") as g:
+            with open(f"{self.root}\\..\\..\\data\\gamelist.json") as g:
                 gamelist = j_load(g) #Read the json gamelist into the json library
             for exe, realname in gamelist.items(): #Iterate through the gamelist and find a matching process that is running
                 if exe in list(programlist.keys()): #Checks through programlist's keys
@@ -260,11 +279,26 @@ class CustomRPC(QObject):
         #self.finished.emit()
 
     def readConfig(self=None):
-        with open(f"{self.root}\\config.json") as f:
+        with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f:
             return j_load(f)
 
+def generateConfig():
+    data = {
+        "client_id": "",
+        "default_state": "  ",
+        "default_details": "  ",
+        "large_text": "  ",
+        "enable_games": True,
+        "enable_media": True,
+        "use_time_left": True
+    }
+    if not path.isdir(f"{environ['LOCALAPPDATA']}\\customrpc"):
+        mkdir(f"{environ['LOCALAPPDATA']}\\customrpc")
+    with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json", "w") as f:
+        f.write(j_print(data, indent=4))
+
 if __name__ == "__main__":
-    with open(f"{getcwd()}\\config.json") as f:
+    with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f:
         config = j_load(f)
 
     rpc = CustomRPC(
