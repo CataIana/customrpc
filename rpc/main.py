@@ -17,14 +17,20 @@ class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         runRPC = kwargs["runRPC"]
         kwargs.pop("runRPC")
+        if "clear_log" in kwargs:
+            clearLog = kwargs["clear_log"]
+            kwargs.pop("clear_log")
+        else:
+            clearLog = False
         super(MainWindow, self).__init__(*args, **kwargs)
         try:
             self.root = path.dirname(path.realpath(__file__))
         except NameError:
             self.root = getcwd()
 
-        with open(f"{self.root}\\log.log", "w"):
-            pass
+        if clearLog:
+            with open(f"{self.root}\\log.log", "w"):
+                pass
         self.log = logging.getLogger("RPC UI")
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
@@ -450,5 +456,5 @@ if __name__ == "__main__":
     #     webhook = DiscordWebhook(url='https://discordapp.com/api/webhooks/714899533213204571/Wa6iiaUBG9Y5jX7arc6-X7BYcY-0-dAjQDdSIQkZPpy_IPGT2NrNhAC_ibXSOEzHyKzz', content=format_exc())
     #     response = webhook.execute()
     app = QApplication(argv)
-    window = MainWindow(runRPC=True)
+    window = MainWindow(runRPC=True, clear_log=True)
     app.exec_()

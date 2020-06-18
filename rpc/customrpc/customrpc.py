@@ -46,7 +46,8 @@ class CustomRPC(QObject):
         super(CustomRPC, self).__init__()
         self.supported_platforms = ["win32"] #It's for personal use, I don't use linux anymore or macos
         if platform not in self.supported_platforms:
-            self.log.critical(f"{bcolors.FAIL}{bcolors.BOLD}Unrecognized Platform! ({platform}){bcolors.ENDC}") #Exit if not on windows
+            #self.log.critical(f"{bcolors.FAIL}{bcolors.BOLD}Unrecognized Platform! ({platform}){bcolors.ENDC}") #Exit if not on windows
+            self.log.critical(f"Unrecognized Platform! ({platform})") #Exit if not on windows
             exit()
         
         self.client_id = client_id
@@ -65,7 +66,8 @@ class CustomRPC(QObject):
 
         self.lastUpdateTime = 0
 
-        self.log.info(f"{bcolors.WARNING}Connecting...{bcolors.ENDC}")
+        #self.log.info(f"{bcolors.WARNING}Connecting...{bcolors.ENDC}")
+        self.log.info("Connecting...")
         self.reconnect() #Initalize connection. Own function created to avoid errors if discord isn't open
         try:
             self.updateRPC(False)
@@ -81,15 +83,19 @@ class CustomRPC(QObject):
             try:
                 self.RPC.connect()
             except InvalidPipe:
-                self.log.error(f"{bcolors.FAIL}Cannot connect to discord! Is discord open? (Invalid Pipe){bcolors.ENDC}")
+                #self.log.error(f"{bcolors.FAIL}Cannot connect to discord! Is discord open? (Invalid Pipe){bcolors.ENDC}")
+                self.log.error("Cannot connect to discord! Is discord open? (Invalid Pipe)")
             except ConnectionRefusedError:
-                self.log.error(f"{bcolors.FAIL}Cannot connect to discord! Is discord open? (Connection Refused){bcolors.ENDC}")
+                #self.log.error(f"{bcolors.FAIL}Cannot connect to discord! Is discord open? (Connection Refused){bcolors.ENDC}")
+                self.log.error("Cannot connect to discord! Is discord open? (Connection Refused)")
             except FileNotFoundError:
-                self.log.error(f"{bcolors.FAIL}Cannot connect to discord! Is discord open? (File Not Found){bcolors.ENDC}")
+                #self.log.error(f"{bcolors.FAIL}Cannot connect to discord! Is discord open? (File Not Found){bcolors.ENDC}")
+                self.log.error("Cannot connect to discord! Is discord open? (File Not Found)")
             except InvalidID:
                 self.log.critical("This fixes the error, but this is never logged. I'm totally lost")
             else:
-                self.log.info(f"{bcolors.OKGREEN}Connected.{bcolors.ENDC}")
+                #self.log.info(f"{bcolors.OKGREEN}Connected.{bcolors.ENDC}")
+                self.log.info("Connected.")
                 break
             sleep(5)
 
@@ -122,7 +128,8 @@ class CustomRPC(QObject):
         timestamps = ""
         for x, y in output["data"]["timestamps"].items():
             timestamps += f"{x}: {y}, ".strip(", ")
-        self.log.info(f"{output['cmd']} State: {bcolors.OKGREEN}{output['data']['state']}{bcolors.ENDC} Details: {bcolors.OKGREEN}{output['data']['details']}{bcolors.ENDC}  Timestamps: {bcolors.OKGREEN}{timestamps}{bcolors.ENDC}")
+        #self.log.info(f"{output['cmd']} State: {bcolors.OKGREEN}{output['data']['state']}{bcolors.ENDC} Details: {bcolors.OKGREEN}{output['data']['details']}{bcolors.ENDC}  Timestamps: {bcolors.OKGREEN}{timestamps}{bcolors.ENDC}")
+        self.log.info(f"{output['cmd']} State: {output['data']['state']} Details: {output['data']['details']}  Timestamps: {timestamps}")
         if wait == True:
             sleep(15)
 
@@ -150,7 +157,8 @@ class CustomRPC(QObject):
             try:
                 self.updateRPC()
             except InvalidID:  #If connection lost to Discord, attempt reconnection
-                self.log.info(f"{bcolors.WARNING}Reconnecting...{bcolors.ENDC}")
+                #self.log.info(f"{bcolors.WARNING}Reconnecting...{bcolors.ENDC}")
+                self.log.info("Reconnecting...")
                 self.RPC.close()
                 sleep(2)
                 self.reconnect()
