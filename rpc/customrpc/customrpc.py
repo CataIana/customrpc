@@ -246,7 +246,7 @@ class CustomRPC(QObject):
                     if title_error != None:
                         if "ctypes" not in globals():
                             import ctypes
-                            ctypes.windll.user32.MessageBoxW(None, "Unable to access VLC web interface!\nHave you set the password to 'rpc'?", "RPC", 0x10)
+                            ctypes.windll.user32.MessageBoxW(None, "Unable to access VLC web interface!\nDid you set the correct password?", "RPC", 0x10)
                     else:
                         vlcstate = soup.find("state").contents[0] #Locate the state object to get if vlc is playing or not
                         if vlcstate == "playing": #Just like music, don't display if not playing
