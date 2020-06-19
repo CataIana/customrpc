@@ -139,7 +139,7 @@ class CustomRPC(QObject):
             prev_state, prev_details, prev_large_text, prev_time_left = self.state, self.details, self.large_text, self.time_left #Store previous state/details
             self.getVariables() #Get variables
             f = True
-            while self.state == prev_state and self.details == prev_details and self.large_text == prev_large_text and abs(self.time_left - prev_time_left) < 3: #If variables haven't changed don't bother sending requests to discord.
+            while self.state == prev_state and self.details == prev_details and self.large_text == prev_large_text and self.compareTimes(self.time_left, prev_time_left): #If variables haven't changed don't bother sending requests to discord.
                 if f:
                     self.log.info("Waiting for update")
                     f = False
@@ -289,6 +289,13 @@ class CustomRPC(QObject):
     def readConfig(self=None):
         with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f:
             return j_load(f)
+
+    def compareTimes(self, a, b):
+        try:
+            if abs(a - b) < 3:
+                return True
+        except TypeError:
+            return True
 
 def generateConfig():
     data = {

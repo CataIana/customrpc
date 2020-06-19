@@ -456,5 +456,5 @@ if __name__ == "__main__":
     #     webhook = DiscordWebhook(url='https://discordapp.com/api/webhooks/714899533213204571/Wa6iiaUBG9Y5jX7arc6-X7BYcY-0-dAjQDdSIQkZPpy_IPGT2NrNhAC_ibXSOEzHyKzz', content=format_exc())
     #     response = webhook.execute()
     app = QApplication(argv)
-    window = MainWindow(runRPC=True, clear_log=True)
+    window = MainWindow(runRPC=True, clear_log=False)
     app.exec_()
