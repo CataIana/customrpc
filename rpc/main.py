@@ -305,28 +305,28 @@ class MainWindow(QMainWindow):
             f.write(j_print(config, indent=4))
 
     def readConfig(self):
-        #try:
+        try:
             with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f:
                 return j_load(f)
-        # except FileNotFoundError:
-        #     self.log.error("Config not found! Generating...")
-        #     data = {
-        #         "client_id": "",
-        #         "default_state": "  ",
-        #         "default_details": "  ",
-        #         "large_text": "  ",
-        #         "enable_games": True,
-        #         "enable_media": True,
-        #         "use_time_left": True,
-        #         "vlc_pwd": ""
-        #     }
-        #     if not path.isdir(f"{environ['LOCALAPPDATA']}\\customrpc"):
-        #         mkdir(f"{environ['LOCALAPPDATA']}\\customrpc")
-        #     with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json", "w") as f:
-        #         f.write(j_print(data, indent=4))
-        #     self.log.info("Sucessfully created config file.")
-        #     with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f:
-        #         return j_load(f)
+        except FileNotFoundError:
+            self.log.error("Config not found! Generating...")
+            data = {
+                "client_id": "",
+                "default_state": "  ",
+                "default_details": "  ",
+                "large_text": "  ",
+                "enable_games": True,
+                "enable_media": True,
+                "use_time_left": True,
+                "vlc_pwd": ""
+            }
+            if not path.isdir(f"{environ['LOCALAPPDATA']}\\customrpc"):
+                mkdir(f"{environ['LOCALAPPDATA']}\\customrpc")
+            with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json", "w") as f:
+                f.write(j_print(data, indent=4))
+            self.log.info("Sucessfully created config file.")
+            with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f:
+                return j_load(f)
 
     def initRPC(self):
         config = self.readConfig()
