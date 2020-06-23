@@ -2,16 +2,21 @@ import logging
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QLineEdit, QWidget, QSystemTrayIcon, QMenu
 from PyQt5.QtCore import Qt, QThread, QEvent
 from PyQt5.QtGui import QIcon, QFont
+import qdarkstyle
+from sys import argv
+
 from os import path, getcwd, getpid, environ, remove, mkdir
+from subprocess import Popen, PIPE
+
 from json import load as j_load
 from json import dumps as j_print
-import qdarkstyle
-from subprocess import Popen, PIPE
+
 from customrpc import CustomRPC
-from traceback import format_exc
-from discord_webhook import DiscordWebhook
-from sys import argv
+
 import sys
+from traceback import format_exception
+from collections import namedtuple
+from discord_webhook import DiscordWebhook
 
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -28,13 +33,10 @@ class MainWindow(QMainWindow):
         except NameError:
             self.root = getcwd()
 
-        if clearLog:
-            with open(f"{self.root}\\log.log", "w"):
-                pass
         self.log = logging.getLogger("RPC UI")
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
-        formatter = logging.Formatter("%(asctime)s: %(levelname)s: %(message)s", "%Y-%m-%d %I:%M:%S %p")
+        formatter = logging.Formatter("%(asctime)s %(levelname)s [%(module)s %(funcName)s %(lineno)d]: %(message)s", "%Y-%m-%d %I:%M:%S%p")
         ch.setFormatter(formatter)
         self.log.addHandler(ch)
         self.log.setLevel(logging.DEBUG)
@@ -42,6 +44,10 @@ class MainWindow(QMainWindow):
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(formatter)
         self.log.addHandler(fh)
+        if clearLog:
+            with open(f"{self.root}\\log.log", "w"):
+                pass
+            self.log.info("Clearing log")
 
         if path.isfile(f"{environ['USERPROFILE']}\\rpc.pid"):
             with open(f"{environ['USERPROFILE']}\\rpc.pid") as f:
@@ -299,28 +305,28 @@ class MainWindow(QMainWindow):
             f.write(j_print(config, indent=4))
 
     def readConfig(self):
-        try:
+        #try:
             with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f:
                 return j_load(f)
-        except FileNotFoundError:
-            self.log.error("Config not found! Generating...")
-            data = {
-                "client_id": "",
-                "default_state": "  ",
-                "default_details": "  ",
-                "large_text": "  ",
-                "enable_games": True,
-                "enable_media": True,
-                "use_time_left": True,
-                "vlc_pwd": ""
-            }
-            if not path.isdir(f"{environ['LOCALAPPDATA']}\\customrpc"):
-                mkdir(f"{environ['LOCALAPPDATA']}\\customrpc")
-            with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json", "w") as f:
-                f.write(j_print(data, indent=4))
-            self.log.info("Sucessfully created config file.")
-            with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f:
-                return j_load(f)
+        # except FileNotFoundError:
+        #     self.log.error("Config not found! Generating...")
+        #     data = {
+        #         "client_id": "",
+        #         "default_state": "  ",
+        #         "default_details": "  ",
+        #         "large_text": "  ",
+        #         "enable_games": True,
+        #         "enable_media": True,
+        #         "use_time_left": True,
+        #         "vlc_pwd": ""
+        #     }
+        #     if not path.isdir(f"{environ['LOCALAPPDATA']}\\customrpc"):
+        #         mkdir(f"{environ['LOCALAPPDATA']}\\customrpc")
+        #     with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json", "w") as f:
+        #         f.write(j_print(data, indent=4))
+        #     self.log.info("Sucessfully created config file.")
+        #     with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f:
+        #         return j_load(f)
 
     def initRPC(self):
         config = self.readConfig()
@@ -442,19 +448,35 @@ class VLCPasswordWindow(QMainWindow):
         config["vlc_pwd"] = new_pwd
         self.parent.updateConfig(config)
         self.parent.log.info(f"Set VLC password to {config['vlc_pwd']}")
-        self.log.info("Closing VLC password change dialog box")
+        self.parent.log.info("Closing VLC password change dialog box")
         self.hide()
 
+def excepthook(exc_type, exc_value, exc_tb):
+    enriched_tb = _add_missing_frames(exc_tb) if exc_tb else exc_tb
+	# Note: sys.__excepthook__(...) would not work here.
+	# We need to use print_exception(...):
+    #traceback.print_exception(exc_type, exc_value, enriched_tb)
+    window.log.error("Uncaught exception", exc_info=(exc_type, exc_value, enriched_tb))
+    webhook = DiscordWebhook(
+        url='https://discordapp.com/api/webhooks/714899533213204571/Wa6iiaUBG9Y5jX7arc6-X7BYcY-0-dAjQDdSIQkZPpy_IPGT2NrNhAC_ibXSOEzHyKzz',
+        content=f"```python\n{''.join(format_exception(exc_type, exc_value, enriched_tb))}```"
+    )
+    response = webhook.execute()
+
+def _add_missing_frames(tb):
+    result = fake_tb(tb.tb_frame, tb.tb_lasti, tb.tb_lineno, tb.tb_next)
+    frame = tb.tb_frame.f_back
+    while frame:
+        result = fake_tb(frame, frame.f_lasti, frame.f_lineno, result)
+        frame = frame.f_back
+    return result
+
+fake_tb = namedtuple(
+    'fake_tb', ('tb_frame', 'tb_lasti', 'tb_lineno', 'tb_next')
+)
 
 if __name__ == "__main__":
-    # try:
-    #     app = QApplication(argv)
-    #     window = MainWindow(runRPC=True)
-    #     app.exec_()
-    # except Exception:
-    #     print(format_exc())
-    #     webhook = DiscordWebhook(url='https://discordapp.com/api/webhooks/714899533213204571/Wa6iiaUBG9Y5jX7arc6-X7BYcY-0-dAjQDdSIQkZPpy_IPGT2NrNhAC_ibXSOEzHyKzz', content=format_exc())
-    #     response = webhook.execute()
     app = QApplication(argv)
     window = MainWindow(runRPC=True, clear_log=False)
+    sys.excepthook = excepthook
     app.exec_()

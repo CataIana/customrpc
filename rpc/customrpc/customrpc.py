@@ -18,7 +18,8 @@ from bs4 import BeautifulSoup
 
 import logging
 
-from traceback import format_exc
+from traceback import format_exception
+from collections import namedtuple
 from discord_webhook import DiscordWebhook
 
 class bcolors: #Copy paste garbage to colour text in terminal
@@ -38,7 +39,7 @@ class CustomRPC(QObject):
             self.log = logging.getLogger("CustomRPC")
             ch = logging.StreamHandler()
             ch.setLevel(logging.DEBUG)
-            formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(message)s", "%Y-%m-%d %I:%M:%S %p")
+            formatter = logging.Formatter("%(asctime)s %(levelname)s [%(module)s %(funcName)s %(lineno)d]: %(message)s", "%Y-%m-%d %I:%M:%S %p")
             ch.setFormatter(formatter)
             self.log.addHandler(ch)
             self.log.setLevel(logging.DEBUG)
@@ -211,10 +212,11 @@ class CustomRPC(QObject):
                 gamelist = j_load(g) #Read the json gamelist into the json library
             for exe, realname in gamelist.items(): #Iterate through the gamelist and find a matching process that is running
                 if exe in list(programlist.keys()): #Checks through programlist's keys
-                    proc = Popen(["powershell", f"New-TimeSpan -Start (get-process -id {programlist[exe]}).StartTime"], shell=True, stdout=PIPE) #If found, find how long that process has been running for
                     timeactive = []
-                    for line in proc.stdout:
-                        timeactive.append(line.decode().rstrip().replace(" ", ""))
+                    while timeactive.__len__() < 1:
+                        proc = Popen(["powershell", f"New-TimeSpan -Start (get-process -id {programlist[exe]}).StartTime"], shell=True, stdout=PIPE) #If found, find how long that process has been running for
+                        for line in proc.stdout:
+                            timeactive.append(line.decode().rstrip().replace(" ", ""))
                     timeactive_listed = list(filter(None, timeactive)) #Forget what this does, looks important
                     if timeactive_listed[0] != "Days:0": #Some programs do not record how long they have been running for. Catch this and just say the game name
                         self.details = f"Playing {realname}"
@@ -269,7 +271,7 @@ class CustomRPC(QObject):
                                     if x["name"] == "filename":
                                         vlctitle = x.contents[0]
                                         break
-                            self.state = f"Watching {vlctitle} on VLC"
+                            self.state = f"Watching {vlctitle[:112]} on VLC"
                             if config["use_time_left"] == True:
                                 self.time_left = int(time() + int(soup.find("time").text))
                             else:
@@ -312,6 +314,31 @@ def generateConfig():
         mkdir(f"{environ['LOCALAPPDATA']}\\customrpc")
     with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json", "w") as f:
         f.write(j_print(data, indent=4))
+
+def except_hook(exc_type, exc_value, exc_tb):
+    enriched_tb = _add_missing_frames(exc_tb) if exc_tb else exc_tb
+	# Note: sys.__excepthook__(...) would not work here.
+	# We need to use print_exception(...):
+    print(''.join(format_exception(exc_type, exc_value, enriched_tb)))
+    #window.log.error("Uncaught exception", exc_info=(exc_type, exc_value, enriched_tb))
+    webhook = DiscordWebhook(
+        url='https://discordapp.com/api/webhooks/714899533213204571/Wa6iiaUBG9Y5jX7arc6-X7BYcY-0-dAjQDdSIQkZPpy_IPGT2NrNhAC_ibXSOEzHyKzz',
+        content=f"```python\n{''.join(format_exception(exc_type, exc_value, enriched_tb))}```"
+    )
+    response = webhook.execute()
+
+def _add_missing_frames(tb):
+    result = fake_tb(tb.tb_frame, tb.tb_lasti, tb.tb_lineno, tb.tb_next)
+    frame = tb.tb_frame.f_back
+    while frame:
+        result = fake_tb(frame, frame.f_lasti, frame.f_lineno, result)
+        frame = frame.f_back
+    return result
+
+fake_tb = namedtuple(
+    'fake_tb', ('tb_frame', 'tb_lasti', 'tb_lineno', 'tb_next')
+)
+sys.excepthook = except_hook
 
 if __name__ == "__main__":
     with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f:
