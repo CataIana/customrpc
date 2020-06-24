@@ -3,7 +3,7 @@ import logging
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QComboBox, QLineEdit, QWidget, QCompleter
 from PyQt5.QtCore import Qt, QFile, QTextStream
 from PyQt5.QtGui import QPalette, QColor, QIcon, QFont
-from os import path, getcwd
+from os import path, getcwd, environ
 from subprocess import Popen, PIPE
 from json import load as j_load
 from json import dumps as j_print
@@ -83,7 +83,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.infoLabel)
 
         widget = QWidget()
-        font = widget.setFont(QFont("Segoe UI", 12))
+        widget.setFont(QFont("Segoe UI", 12))
         
         widget.setLayout(layout)
         self.setCentralWidget(widget)
@@ -117,7 +117,7 @@ class MainWindow(QMainWindow):
             self.log.info("Blank selected. Disabling button")
         else:
             self.chosen = self.programList.itemText(index)
-            with open(f"{self.root}\\..\\data\\gamelist.json") as ga:
+            with open(f"{environ['LOCALAPPDATA']}\\customrpc\\gamelist.json") as ga:
                 gamelist = j_load(ga)
             if self.chosen in list(gamelist.keys()):
                 self.infoLabel.setText("Executable already defined!")
@@ -133,10 +133,10 @@ class MainWindow(QMainWindow):
         realname = self.realNameInput.text()
         if self.chosen != "" and realname != "":
             self.infoLabel.setText(f"Adding {self.chosen}...")
-            with open(f"{self.root}\\..\\data\\gamelist.json") as ga:
+            with open(f"{environ['LOCALAPPDATA']}\\customrpc\\gamelist.json") as ga:
                 gamelist = j_load(ga)
             gamelist[self.chosen] = realname
-            with open(f"{self.root}\\..\\data\\gamelist.json", "w") as gw:
+            with open(f"{environ['LOCALAPPDATA']}\\customrpc\\gamelist.json", "w") as gw:
                 gw.write(j_print(gamelist, indent=4))
             self.infoLabel.setText("Done!")
             self.log.info(f"Successfully added {self.chosen} to game list under {realname}")
@@ -146,7 +146,7 @@ class MainWindow(QMainWindow):
     
     def showGameList(self):
         self.log.info("Showing game list")
-        folder = f"{self.root}\\..\\data\\gamelist.json"
+        folder = f"{environ['LOCALAPPDATA']}\\customrpc\\gamelist.json"
         Popen(f"start {folder}", shell=True)
 
 
