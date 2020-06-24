@@ -28,7 +28,7 @@ class RPCHourCount():
         ch.setFormatter(formatter)
         self.log.addHandler(ch)
         self.log.setLevel(logging.DEBUG)
-        fh = logging.FileHandler(f"{self.root}\\spam.log")
+        fh = logging.FileHandler(f"{self.root}\\log.log")
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(formatter)
         self.log.addHandler(fh)
