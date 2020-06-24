@@ -7,10 +7,10 @@ from time import sleep
 from sys import platform
 
 exe_name = "rpc"
-py_file = "main.py"
+py_file = "ui.py"
 donotremove = [
     py_file,
-    "customrpc",
+    "imports",
     path.basename(__file__)
 ]
 output = Popen(["taskkill", "/im", f"{exe_name}.exe", "/f"], stdout=PIPE)
@@ -39,7 +39,7 @@ executables = [
 ]
 
 setup(name="CustomRPC",
-      version = "3.4",
+      version = "4.0",
       description = "RPC",
       options = dict(build_exe = buildOptions),
       executables = executables)

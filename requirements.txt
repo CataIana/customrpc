@@ -6,3 +6,4 @@ lxml
 openpyxl
 
 qdarkstyle
+PyQt5

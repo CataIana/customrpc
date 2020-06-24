@@ -1,4 +1,5 @@
 import logging
+from os import path, getcwd
 
 def getLogger(level):
     log = logging.getLogger("RPC UI")
@@ -12,8 +13,11 @@ def getLogger(level):
     ch.setFormatter(formatter)
     log.addHandler(ch)
     
-
-    fh = logging.FileHandler("log.log")
+    try:
+        root = path.dirname(path.realpath(__file__))
+    except NameError:
+        root = getcwd()
+    fh = logging.FileHandler(f"{root}\\log.log")
     fh.setLevel(level)
     
     fh.setFormatter(formatter)

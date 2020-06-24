@@ -8,6 +8,7 @@ from discord_webhook import DiscordEmbed
 import logging
 from time import sleep
 from sys import exit
+import ctypes
 
 class RPCHourCount():
     def __init__(self):
@@ -19,8 +20,6 @@ class RPCHourCount():
         self.open_processes = {}
         self.exclusions = ["svchost.exe"]
 
-        with open(f"{self.root}\\spam.log", "w"):
-            pass
         self.log = logging.getLogger("Hourcounter")
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
@@ -34,15 +33,18 @@ class RPCHourCount():
         fh.setFormatter(formatter)
         self.log.addHandler(fh)
 
-        if path.isfile(f"{environ['USERPROFILE']}\\hourcount.pid"):
-            with open(f"{environ['USERPROFILE']}\\hourcount.pid") as f:
+        if path.isfile(f"{environ['USERPROFILE']}\\rpc.pid"):
+            with open(f"{environ['USERPROFILE']}\\rpc.pid") as f:
                 pid = f.read()
-            proc = Popen(["WMIC", "PROCESS", "get", "ProcessID"], shell=True, stdout=PIPE)
-            if pid in str(proc.stdout.read()):
-                self.log.critical(f"Already running! ({pid})")
-                import ctypes
-                ctypes.windll.user32.MessageBoxW(None, "Already Running!", "Hourcount", 0x10)
-                exit()
+            proc = Popen(["WMIC", "PROCESS", "get", "Caption", ",", "ProcessID"], shell=True, stdout=PIPE) #Get running processes and process ids associated with them
+            for line in proc.stdout:
+                program = line.decode().rstrip().split()
+                if len(program) > 0:
+                    if program[1] == pid:
+                        if program[0] == "rpc.exe":
+                            self.log.critical(f"Already running! ({pid})")
+                            ctypes.windll.user32.MessageBoxW(None, "Already Running!", "RPC", 0x10)
+                            exit()
 
         with open(f"{environ['USERPROFILE']}\\hourcount.pid", "w") as p:
             p.write(str(getpid()))
@@ -54,15 +56,15 @@ class RPCHourCount():
 
     def add_to_database(self, **kwargs):
         realname, totalhrs = kwargs["realname"], kwargs["totalhrs"]
-        with open(f"{self.root}\\..\\data\\hourcount.json") as g:
+        with open(f"{environ['LOCALAPPDATA']}\\customrpc\\hourcount.json") as g:
             hourcount = j_load(g)
         if realname in hourcount.keys():
             hourcount[realname] += float(totalhrs)
-            with open(f"{self.root}\\..\\data\\hourcount.json", "w") as g:
+            with open(f"{environ['LOCALAPPDATA']}\\customrpc\\hourcount.json", "w") as g:
                 g.write(j_print(hourcount, indent=4))
         else:
             hourcount[realname] = float(totalhrs)
-            with open(f"{self.root}\\..\\data\\hourcount.json", "w") as g:
+            with open(f"{environ['LOCALAPPDATA']}\\customrpc\\hourcount.json", "w") as g:
                 g.write(j_print(hourcount, indent=4))
 
     def active_dict(self, pid):
@@ -87,7 +89,7 @@ class RPCHourCount():
         toremove = []
         for active_process in self.open_processes:
             if active_process not in self.programlist.keys():
-                with open(f"{self.root}\\..\\data\\gamelist.json") as e:
+                with open(f"{environ['LOCALAPPDATA']}\\customrpc\\gamelist.json") as e:
                     gamelist = j_load(e)
                 for x, y in gamelist.items():
                     if x == active_process:
@@ -108,7 +110,7 @@ class RPCHourCount():
                 if program[0] not in self.exclusions: #If process isn't in exclusions list
                     self.programlist[program[0]] = program[1] #Add process and process id to dictionary
 
-        with open(f"{self.root}\\..\\data\\gamelist.json") as e:
+        with open(f"{environ['LOCALAPPDATA']}\\customrpc\\gamelist.json") as e:
             inclusions = j_load(e)
 
         for exe in inclusions.keys():
