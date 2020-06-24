@@ -33,15 +33,15 @@ class RPCHourCount():
         fh.setFormatter(formatter)
         self.log.addHandler(fh)
 
-        if path.isfile(f"{environ['USERPROFILE']}\\rpc.pid"):
-            with open(f"{environ['USERPROFILE']}\\rpc.pid") as f:
+        if path.isfile(f"{environ['USERPROFILE']}\\hourcount.pid"):
+            with open(f"{environ['USERPROFILE']}\\hourcount.pid") as f:
                 pid = f.read()
             proc = Popen(["WMIC", "PROCESS", "get", "Caption", ",", "ProcessID"], shell=True, stdout=PIPE) #Get running processes and process ids associated with them
             for line in proc.stdout:
                 program = line.decode().rstrip().split()
                 if len(program) > 0:
                     if program[1] == pid:
-                        if program[0] == "rpc.exe":
+                        if program[0] == "hourcount.exe":
                             self.log.critical(f"Already running! ({pid})")
                             ctypes.windll.user32.MessageBoxW(None, "Already Running!", "RPC", 0x10)
                             exit()

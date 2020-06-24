@@ -31,17 +31,17 @@ class CustomRPC(Presence):
             self.log.critical(f"Unsupported Platform! ({sys.platform})") #Exit if not on windows
             sys.exit()
 
-        self.time_left = None
-        self.exclusions = ["svchost.exe"] #Clean up program list. Kinda uncessary but probably saves ram.
-        self.image_list = ["kitty", "chicken", "chickies", "chub",  "kitty2", "kitty3", "kitty4", "sleepy", "kitty5", "kitty6", "kitty7"] #The images available to the script
-        self.music_file = f"{self.root}\\..\\rainmeter skin\\@Resources\\music.txt"
-        self.isConnected = False
-        self.lastUpdateTime = 0
-
         try:
            self.root = path.dirname(path.realpath(__file__))
         except NameError:
             self.root = getcwd()
+
+        self.time_left = None
+        self.exclusions = ["svchost.exe"] #Clean up program list. Kinda uncessary but probably saves ram.
+        self.image_list = ["kitty", "chicken", "chickies", "chub",  "kitty2", "kitty3", "kitty4", "sleepy", "kitty5", "kitty6", "kitty7"] #The images available to the script
+        self.music_file = f"{self.root}\\..\\..\\rainmeter skin\\@Resources\\music.txt"
+        self.isConnected = False
+        self.lastUpdateTime = 0
 
         self.rSession = Session()
 

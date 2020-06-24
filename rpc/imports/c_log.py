@@ -17,7 +17,7 @@ def getLogger(level):
         root = path.dirname(path.realpath(__file__))
     except NameError:
         root = getcwd()
-    fh = logging.FileHandler(f"{root}\\log.log")
+    fh = logging.FileHandler(f"{root}\\..\\log.log")
     fh.setLevel(level)
     
     fh.setFormatter(formatter)
