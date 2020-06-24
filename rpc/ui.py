@@ -1,9 +1,8 @@
-import logging
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QLineEdit, QWidget, QSystemTrayIcon, QMenu
-from PyQt5.QtCore import Qt, QThread, QEvent
 from PyQt5.QtGui import QIcon, QFont
+from PyQt5.QtCore import Qt, QEvent
 import qdarkstyle
-from sys import argv
+import ctypes
 
 from os import path, getcwd, getpid, environ, remove, mkdir
 from subprocess import Popen, PIPE
@@ -11,44 +10,43 @@ from subprocess import Popen, PIPE
 from json import load as j_load
 from json import dumps as j_print
 
-from customrpc import CustomRPC
-
 import sys
-from traceback import format_exception
-from collections import namedtuple
-from discord_webhook import DiscordWebhook
+from imports import CustomRPC, except_hook, getLogger, VLCPasswordWindow
 
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
-        runRPC = kwargs["runRPC"]
+        self.runRPC = kwargs["runRPC"]
         kwargs.pop("runRPC")
-        if "clear_log" in kwargs:
-            clearLog = kwargs["clear_log"]
-            kwargs.pop("clear_log")
-        else:
-            clearLog = False
         super(MainWindow, self).__init__(*args, **kwargs)
         try:
             self.root = path.dirname(path.realpath(__file__))
         except NameError:
             self.root = getcwd()
 
-        self.log = logging.getLogger("RPC UI")
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
-        formatter = logging.Formatter("%(asctime)s %(levelname)s [%(module)s %(funcName)s %(lineno)d]: %(message)s", "%Y-%m-%d %I:%M:%S%p")
-        ch.setFormatter(formatter)
-        self.log.addHandler(ch)
-        self.log.setLevel(logging.DEBUG)
-        fh = logging.FileHandler(f"{self.root}\\log.log")
-        fh.setLevel(logging.DEBUG)
-        fh.setFormatter(formatter)
-        self.log.addHandler(fh)
-        if clearLog:
-            with open(f"{self.root}\\log.log", "w"):
-                pass
-            self.log.info("Clearing log")
+        #Create logger
+        self.log = getLogger("DEBUG")
 
+        #Run checks before starting
+        self.checks()
+
+        #Set variables
+        self.variables()
+        
+        #Setup the UI
+        self.initUI()
+
+        if self.runRPC:
+            self.initRPC()
+        self.log.debug("Finished init")
+
+    def variables(self):
+        self.windowTitle = "RPC Settings"
+        self.iconDir = f"{self.root}\\..\\icon.ico"
+        self.toolTip = "CustomRPC"
+        self.font = QFont("Segoe UI", 12)
+        self.updateText = "Update"
+
+    def checks(self):
         if path.isfile(f"{environ['USERPROFILE']}\\rpc.pid"):
             with open(f"{environ['USERPROFILE']}\\rpc.pid") as f:
                 pid = f.read()
@@ -59,112 +57,135 @@ class MainWindow(QMainWindow):
                     if program[1] == pid:
                         if program[0] == "rpc.exe":
                             self.log.critical(f"Already running! ({pid})")
-                            import ctypes
                             ctypes.windll.user32.MessageBoxW(None, "Already Running!", "RPC", 0x10)
                             sys.exit()
-
+        
         with open(f"{environ['USERPROFILE']}\\rpc.pid", "w") as p:
             p.write(str(getpid()))
             self.log.debug(f"PID: {getpid()}")
     
-        if runRPC:
-            self.initRPC()
-
-        self.setWindowTitle("RPC Settings")
+    def initUI(self):
+        self.setWindowTitle(self.windowTitle)
         self.setStyleSheet(qdarkstyle.load_stylesheet())
 
-        self.icondir = f"{self.root}\\..\\icon.ico"
-
-        self.trayIcon = QSystemTrayIcon(QIcon(self.icondir), self)
+        #Set tray icon
+        self.trayIcon = QSystemTrayIcon(QIcon(self.iconDir), self)
         self.trayIcon.activated.connect(self.trayClicked)
-        self.trayIcon.setToolTip("CustomRPC")
-        menu = QMenu()
-        menu.addAction("Settings", self.settings)
-        menu.addAction("Exit", self.exit)
-        self.trayIcon.setContextMenu(menu)
+        self.trayIcon.setToolTip(self.toolTip)
 
-        self.setWindowIcon(QIcon(self.icondir))
+        #Create menu for tray icon
+        self.menu = QMenu()
+        self.menu.addAction("Settings", self.settings)
+        self.menu.addAction("Exit", self.exit)
+        self.trayIcon.setContextMenu(self.menu)
 
-        layout = QVBoxLayout()
-        title = QVBoxLayout()
-        clientID = QHBoxLayout()
-        state = QHBoxLayout()
-        details = QHBoxLayout()
-        largeText = QHBoxLayout()
-        options = QHBoxLayout()
-        options2 = QHBoxLayout()
-        infoBox = QHBoxLayout()
+        #Set window icon
+        self.setWindowIcon(QIcon(self.iconDir))
+
+
+        #Create all the layouts
+        self.mainLayout = QVBoxLayout()
+        self.titleLayout = QVBoxLayout()
+        self.clientIDLayout = QHBoxLayout()
+        self.stateLayout = QHBoxLayout()
+        self.detailsLayout = QHBoxLayout()
+        self.largeTextLayout = QHBoxLayout()
+        self.optionsLayout = QHBoxLayout()
+        self.options2Layout = QHBoxLayout()
+        self.infoboxLayout = QHBoxLayout()
 
         config = self.readConfig()
 
         ##################################################################
 
-        titleLabel = QLabel("RPC Settings")
+        #Objects
+        titleLabel = QLabel(self.windowTitle)
 
-        title.addWidget(titleLabel)
+        #Add Widgets
+        self.titleLayout.addWidget(titleLabel)
 
-        titleLabel.setFont(QFont("Segoe UI", 14))
+        #Set extra data
+        titleLabel.setFont(self.font)
         titleLabel.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
 
-        layout.addLayout(title)
-        ##################################################################3
+        #Add layout
+        self.mainLayout.addLayout(self.titleLayout)
 
+        ##################################################################
+
+        #Objects
         clientIDLabel = QLabel("Client ID:")
         self.clientIDInput = QLineEdit(str(config["client_id"]))
-        self.clientIDButton = QPushButton("Update")
+        self.clientIDButton = QPushButton(self.updateText)
+        
+        #Add Widgets
+        self.clientIDLayout.addWidget(clientIDLabel)
+        self.clientIDLayout.addWidget(self.clientIDInput)
+        self.clientIDLayout.addWidget(self.clientIDButton)
 
+        #Set extra data
         self.clientIDButton.clicked.connect(self.updateClientID)
 
-        clientID.addWidget(clientIDLabel)
-        clientID.addWidget(self.clientIDInput)
-        clientID.addWidget(self.clientIDButton)
-
-        layout.addLayout(clientID)
+        #Add layout
+        self.mainLayout.addLayout(self.clientIDLayout)
 
         ##################################################################
 
+        #Objects
         stateLabel = QLabel("Default State:")
         self.stateInput = QLineEdit(config["default_state"])
+        self.stateButton = QPushButton(self.updateText)
 
-        self.stateButton = QPushButton("Update")
+        #Add Widgets
+        self.stateLayout.addWidget(stateLabel)
+        self.stateLayout.addWidget(self.stateInput)
+        self.stateLayout.addWidget(self.stateButton)
 
+        #Set extra data
         self.stateButton.clicked.connect(self.updateState)
 
-        state.addWidget(stateLabel)
-        state.addWidget(self.stateInput)
-        state.addWidget(self.stateButton)
-
-        layout.addLayout(state)
+        #Add layout
+        self.mainLayout.addLayout(self.stateLayout)
 
         ##################################################################
 
+        #Objects
         detailsLabel = QLabel("Default Details:")
         self.detailsInput = QLineEdit(config["default_details"])
-        self.detailsButton = QPushButton("Update")
+        self.detailsButton = QPushButton(self.updateText)
 
+        #Add widgets
+        self.detailsLayout.addWidget(detailsLabel)
+        self.detailsLayout.addWidget(self.detailsInput)
+        self.detailsLayout.addWidget(self.detailsButton)
+
+        #Set extra data
         self.detailsButton.clicked.connect(self.updateDetails)
 
-        details.addWidget(detailsLabel)
-        details.addWidget(self.detailsInput)
-        details.addWidget(self.detailsButton)
-
-        layout.addLayout(details)
+        #Add layout
+        self.mainLayout.addLayout(self.detailsLayout)
 
         ##################################################################
 
+        #Objects
         largeTextLabel = QLabel("Large Text:")
         self.largeTextInput = QLineEdit(config["large_text"])
-        self.largeTextButton = QPushButton("Update")
+        self.largeTextButton = QPushButton(self.updateText)
 
+        #Add widgets
+        self.largeTextLayout.addWidget(largeTextLabel)
+        self.largeTextLayout.addWidget(self.largeTextInput)
+        self.largeTextLayout.addWidget(self.largeTextButton)
+
+        #Set extra data
         self.largeTextButton.clicked.connect(self.updateLargeText)
 
-        largeText.addWidget(largeTextLabel)
-        largeText.addWidget(self.largeTextInput)
-        largeText.addWidget(self.largeTextButton)
-
-        layout.addLayout(largeText)
+        #Add layout
+        self.mainLayout.addLayout(self.largeTextLayout)
 
         ##################################################################
+        
+        #Objects
         if config["enable_games"] == True:
             self.disableGames = QPushButton("Disable Games")
         else:
@@ -178,44 +199,55 @@ class MainWindow(QMainWindow):
         else:
             self.timeFormat = QPushButton("Use End Time")
 
+        #Add widgets
+        self.optionsLayout.addWidget(self.disableGames)
+        self.optionsLayout.addWidget(self.disableMedia)
+        self.optionsLayout.addWidget(self.timeFormat)
+
+        #Set extra data
         self.disableGames.clicked.connect(self.toggleGames)
         self.disableMedia.clicked.connect(self.toggleMedia)
         self.timeFormat.clicked.connect(self.toggleTime)
 
-        options.addWidget(self.disableGames)
-        options.addWidget(self.disableMedia)
-        options.addWidget(self.timeFormat)
-
-        layout.addLayout(options)
+        #Add layout
+        self.mainLayout.addLayout(self.optionsLayout)
 
         ##################################################################
 
+        #Objects
         self.chgVLCPwd = QPushButton("VLC Password")
         ph1 = QPushButton()
         ph2 = QPushButton()
 
+        #Add widgets
+        self.options2Layout.addWidget(self.chgVLCPwd)
+        self.options2Layout.addWidget(ph1)
+        self.options2Layout.addWidget(ph2)
+
+        #Set extra data
         self.chgVLCPwd.clicked.connect(self.showVLCPwdWindow)
 
-        options2.addWidget(self.chgVLCPwd)
-        options2.addWidget(ph1)
-        options2.addWidget(ph2)
-
-        layout.addLayout(options2)
+        #Add layout
+        self.mainLayout.addLayout(self.options2Layout)
 
         ##################################################################
 
+        #Objects
         self.info = QLabel("")
 
-        infoBox.addWidget(self.info)
+        #Add widgets
+        self.infoboxLayout.addWidget(self.info)
 
-        layout.addLayout(infoBox)
+        #Add layout
+        self.mainLayout.addLayout(self.infoboxLayout)
 
-        widget = QWidget()
-        widget.setFont(QFont("Segoe UI", 12))
+        #Create Qwidget and set layout into widget
+        self.mainWidget = QWidget()
+        self.mainWidget.setFont(self.font)
+        self.mainWidget.setLayout(self.mainLayout)
 
-        widget.setLayout(layout)
-        self.setCentralWidget(widget)
-        self.setFixedSize(400, 280)
+        self.setCentralWidget(self.mainWidget)
+        self.setFixedSize(400, 280) #Set window dimensions
         self.trayIcon.show()
 
     def updateClientID(self):
@@ -328,24 +360,6 @@ class MainWindow(QMainWindow):
             with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f:
                 return j_load(f)
 
-    def initRPC(self):
-        config = self.readConfig()
-        try:
-            int(config["client_id"])
-        except ValueError:
-            self.log.critical("Client ID is not a valid integer!")
-            return
-        try:
-            self.rpc = CustomRPC(int(config["client_id"]), state=config["default_state"], details=config["default_details"], large_text=config["large_text"], log=self.log)
-        except TypeError:
-            pass
-        else:
-            self.thread = QThread()
-            self.rpc.moveToThread(self.thread)
-            #self.rpc.finished.connect(self.thread.quit)
-            self.thread.started.connect(self.rpc.loop)
-            self.thread.start()
-
     def exit(self):
         self.trayIcon.hide()
         self.hide()
@@ -406,77 +420,13 @@ class MainWindow(QMainWindow):
         self.log.info(f"Toggled time format to {config['use_time_left']}")
         self.updateConfig(config)
 
-class VLCPasswordWindow(QMainWindow):
-    def __init__(self, parent):
-        super(VLCPasswordWindow, self).__init__()
-        self.parent = parent
-
-        self.setWindowTitle("Change VLC Password")
-        self.setStyleSheet(qdarkstyle.load_stylesheet())
-
-        self.setWindowIcon(QIcon(parent.icondir))
-
-        layout = QVBoxLayout()
-
-        config = self.parent.readConfig()
-
-        ##################################################################
-
-        titleLabel = QLabel("Change VLC Password")
-        titleLabel.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-
-        self.pwdInput = QLineEdit(config["vlc_pwd"])
-        self.pwdInput.setEchoMode(QLineEdit.Password)
-        self.pwdButton = QPushButton("Change Password")
-
-        self.pwdInput.returnPressed.connect(self.pwdButton.click)
-        self.pwdButton.clicked.connect(self.setPassword)
-
-        layout.addWidget(titleLabel)
-        layout.addWidget(self.pwdInput)
-        layout.addWidget(self.pwdButton)
-
-        widget = QWidget()
-        widget.setFont(QFont("Segoe UI", 12))
-        widget.setLayout(layout)
-        self.setCentralWidget(widget)
-        self.setFixedSize(300, 150)
-
-    def setPassword(self):
-        new_pwd = self.pwdInput.text()
-        config = self.parent.readConfig()
-        config["vlc_pwd"] = new_pwd
-        self.parent.updateConfig(config)
-        self.parent.log.info(f"Set VLC password to {config['vlc_pwd']}")
-        self.parent.log.info("Closing VLC password change dialog box")
-        self.hide()
-
-def excepthook(exc_type, exc_value, exc_tb):
-    enriched_tb = _add_missing_frames(exc_tb) if exc_tb else exc_tb
-	# Note: sys.__excepthook__(...) would not work here.
-	# We need to use print_exception(...):
-    #traceback.print_exception(exc_type, exc_value, enriched_tb)
-    window.log.error("Uncaught exception", exc_info=(exc_type, exc_value, enriched_tb))
-    webhook = DiscordWebhook(
-        url='https://discordapp.com/api/webhooks/714899533213204571/Wa6iiaUBG9Y5jX7arc6-X7BYcY-0-dAjQDdSIQkZPpy_IPGT2NrNhAC_ibXSOEzHyKzz',
-        content=f"```python\n{''.join(format_exception(exc_type, exc_value, enriched_tb))}```"
-    )
-    response = webhook.execute()
-
-def _add_missing_frames(tb):
-    result = fake_tb(tb.tb_frame, tb.tb_lasti, tb.tb_lineno, tb.tb_next)
-    frame = tb.tb_frame.f_back
-    while frame:
-        result = fake_tb(frame, frame.f_lasti, frame.f_lineno, result)
-        frame = frame.f_back
-    return result
-
-fake_tb = namedtuple(
-    'fake_tb', ('tb_frame', 'tb_lasti', 'tb_lineno', 'tb_next')
-)
+    def initRPC(self):
+        config = self.readConfig()
+        self.rpc = CustomRPC(config["client_id"], logger=self.log)
+        self.rpc.mainLoop()
 
 if __name__ == "__main__":
-    app = QApplication(argv)
-    window = MainWindow(runRPC=True, clear_log=False)
-    sys.excepthook = excepthook
-    app.exec_()
+    app = QApplication(sys.argv)
+    window = MainWindow(runRPC=True)
+    sys.excepthook = except_hook
+    sys.exit(app.exec_())
