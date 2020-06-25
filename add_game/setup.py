@@ -36,7 +36,7 @@ executables = [
 ]
 
 setup(name='RPCAddGame',
-      version = '2.2',
+      version = '2.3',
       description = 'RPC Add Game',
       options = dict(build_exe = buildOptions),
       executables = executables)

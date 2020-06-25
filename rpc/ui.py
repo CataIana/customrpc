@@ -216,16 +216,17 @@ class MainWindow(QMainWindow):
 
         #Objects
         self.chgVLCPwd = QPushButton("VLC Password")
-        ph1 = QPushButton()
+        self.viewLog = QPushButton("View Log")
         ph2 = QPushButton()
 
         #Add widgets
         self.options2Layout.addWidget(self.chgVLCPwd)
-        self.options2Layout.addWidget(ph1)
+        self.options2Layout.addWidget(self.viewLog)
         self.options2Layout.addWidget(ph2)
 
         #Set extra data
         self.chgVLCPwd.clicked.connect(self.showVLCPwdWindow)
+        self.viewLog.clicked.connect(self.showLogFile)
 
         #Add layout
         self.mainLayout.addLayout(self.options2Layout)
@@ -327,6 +328,14 @@ class MainWindow(QMainWindow):
         if b:
             self.updateConfig(config)
 
+    def showLogFile(self):
+        self.log.info("Opening log file")
+        folder = f"{self.root}\\log.log"
+        try:
+            Popen(["C:\\Program Files\\Notepad++\\notepad++.exe", folder])
+        except FileNotFoundError:
+            Popen(["notepad", folder])
+
     def showVLCPwdWindow(self):
         self.log.info("Showing VLC password change dialog box")
         self.VlcPwdWin = VLCPasswordWindow(self)
@@ -364,6 +373,7 @@ class MainWindow(QMainWindow):
         self.trayIcon.hide()
         self.hide()
         remove(f"{environ['USERPROFILE']}\\rpc.pid")
+        self.log.info("Exiting...")
         sys.exit()
 
     def settings(self):

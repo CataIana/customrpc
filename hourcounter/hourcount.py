@@ -81,7 +81,10 @@ class RPCHourCount():
         d = {}
         for line in list(filter(None, timeactive)):
             d[line.split(":")[0]] = line.split(":")[1]
-        return d["TotalHours"]
+        try:
+            return d["TotalHours"]
+        except KeyError:
+            raise KeyError(d)
 
     def close_loop(self):
         self.program_loop()
