@@ -11,7 +11,8 @@ from json import load as j_load
 from json import dumps as j_print
 
 import sys
-from imports import CustomRPC, except_hook, getLogger, VLCPasswordWindow
+from imports import CustomRPC, getLogger, VLCPasswordWindow, except_info
+from traceback import format_exception
 
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -217,16 +218,17 @@ class MainWindow(QMainWindow):
         #Objects
         self.chgVLCPwd = QPushButton("VLC Password")
         self.viewLog = QPushButton("View Log")
-        ph2 = QPushButton()
+        self.restartButton = QPushButton("Restart RPC")
 
         #Add widgets
         self.options2Layout.addWidget(self.chgVLCPwd)
         self.options2Layout.addWidget(self.viewLog)
-        self.options2Layout.addWidget(ph2)
+        self.options2Layout.addWidget(self.restartButton)
 
         #Set extra data
         self.chgVLCPwd.clicked.connect(self.showVLCPwdWindow)
         self.viewLog.clicked.connect(self.showLogFile)
+        self.restartButton.clicked.connect(self.restartRPC)
 
         #Add layout
         self.mainLayout.addLayout(self.options2Layout)
@@ -430,13 +432,22 @@ class MainWindow(QMainWindow):
         self.log.info(f"Toggled time format to {config['use_time_left']}")
         self.updateConfig(config)
 
+    def restartRPC(self):
+        self.log.info("Restarting RPC")
+        self.rpc.stop()
+        self.initRPC()
+
     def initRPC(self):
         config = self.readConfig()
         self.rpc = CustomRPC(config["client_id"], logger=self.log)
         self.rpc.mainLoop()
 
+    def except_hook(self, exc_type, exc_value, exc_tb):
+        enriched_tb = except_info(exc_tb) if exc_tb else exc_tb
+        self.log.info(f"Uncaught exception: {format_exception(exc_type, exc_value, enriched_tb)}")
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow(runRPC=True)
-    sys.excepthook = except_hook
+    sys.excepthook = window.except_hook
     sys.exit(app.exec_())

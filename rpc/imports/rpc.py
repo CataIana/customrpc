@@ -3,6 +3,7 @@ from pypresence.exceptions import InvalidPipe, InvalidID, ServerError
 from PyQt5.QtCore import QTimer, QEventLoop
 
 from random import choice
+from win10toast import ToastNotifier
 
 import sys
 from time import time
@@ -37,13 +38,17 @@ class CustomRPC(Presence):
             self.root = getcwd()
 
         self.time_left = None
+        self.toaster = ToastNotifier()
         self.exclusions = ["svchost.exe"] #Clean up program list. Kinda uncessary but probably saves ram.
-        self.image_list = ["kitty", "chicken", "chickies", "chub",  "kitty2", "kitty3", "kitty4", "sleepy", "kitty5", "kitty6", "kitty7"] #The images available to the script
+        self.image_list = ["kitty", "chicken", "chickies", "chub", "kitty2", "kitty3", "kitty4", "sleepy", "kitty5", "kitty6", "kitty7"] #The images available to the script
         self.music_file = f"{self.root}\\..\\..\\rainmeter skin\\@Resources\\music.txt"
         self.isConnected = False
         self.lastUpdateTime = 0
+        self.errored = False
 
         self.rSession = Session()
+
+        self.isRunning = True
 
         self.reconnect() #Initalize connection. Own function created to avoid errors if discord isn't open
         try:
@@ -104,7 +109,6 @@ class CustomRPC(Presence):
         timestamps = ""
         for x, y in output["data"]["timestamps"].items():
             timestamps += f"{x}: {y}, ".strip(", ")
-        #self.log.info(f"{output['cmd']} State: {bcolors.OKGREEN}{output['data']['state']}{bcolors.ENDC} Details: {bcolors.OKGREEN}{output['data']['details']}{bcolors.ENDC}  Timestamps: {bcolors.OKGREEN}{timestamps}{bcolors.ENDC}")
         self.log.info(f"{output['cmd']} State: {output['data']['state']} Details: {output['data']['details']}  Timestamps: {timestamps}")
         if wait == True:
             loop = QEventLoop()
@@ -112,7 +116,7 @@ class CustomRPC(Presence):
             loop.exec_()
 
     def mainLoop(self):
-        while True:
+        while self.isRunning:
             if self.isConnected:
                 prev_state, prev_details, prev_large_text, prev_time_left = self.state, self.details, self.large_text, self.time_left #Store previous state/details
                 self.getVariables() #Get variables
@@ -137,7 +141,6 @@ class CustomRPC(Presence):
                 try:
                     self.updateRPC()
                 except InvalidID:  #If connection lost to Discord, attempt reconnection
-                    #self.log.info(f"{bcolors.WARNING}Reconnecting...{bcolors.ENDC}")
                     self.log.info("Reconnecting...")
                     self.isConnected = False
                     self.close()
@@ -149,8 +152,11 @@ class CustomRPC(Presence):
     def getVariables(self):
         config = self.readConfig()
         if config["enable_media"] == True:
-            with open(self.music_file) as f:
-                music_read = f.read().splitlines() #Read music file
+            try:
+                with open(self.music_file) as f:
+                    music_read = f.read().splitlines() #Read music file
+            except FileNotFoundError:
+                config["enable_media"] = False
             try:
                 if music_read[1] == "1": #The second line has a 1 in it if music is playing, 0 if paused, and 3 if stopped. Rainmeter/Luas/Webnowplayings choice I dont pick
                     self.state = music_read[0] #Set details to currently playing song
@@ -234,16 +240,24 @@ class CustomRPC(Presence):
                 try:
                     r = self.rSession.get('http://localhost:8080/requests/status.xml', verify=False) #Authenticate the vlc web client
                 except ConnectionError:
-                    if "ctypes" not in globals():
-                        import ctypes
-                        ctypes.windll.user32.MessageBoxW(None, "Unable to access VLC web interface!\nHave you activated the web interface?\nHave you allowed VLC through Windows Firewall?", "RPC", 0x10)
+                    if self.errored == False:
+                        self.toaster.show_toast("RPC",
+                            "Unable to access VLC web interface!\nHave you activated the web interface?\nHave you allowed VLC through Windows Firewall?",
+                            icon_path="custom.ico",
+                            duration=10
+                        )
+                        self.errored = True
                 else:
                     soup = BeautifulSoup(r.text, "lxml") #Do the BS4 magic
                     title_error = soup.find("title")
                     if title_error != None:
-                        if "ctypes" not in globals():
-                            import ctypes
-                            ctypes.windll.user32.MessageBoxW(None, "Unable to access VLC web interface!\nDid you set the correct password?", "RPC", 0x10)
+                        if self.errored == False:
+                            self.toaster.show_toast("RPC",
+                                "Unable to access VLC web interface!\nDid you set the correct password?",
+                                icon_path="custom.ico",
+                                duration=10
+                            )
+                            self.errored = True
                     else:
                         vlcstate = soup.find("state").contents[0] #Locate the state object to get if vlc is playing or not
                         if vlcstate == "playing": #Just like music, don't display if not playing
@@ -278,3 +292,8 @@ class CustomRPC(Presence):
                 return True
         except TypeError:
             return True
+
+    def stop(self):
+        self.clear()
+        self.close()
+        self.isRunning = False
