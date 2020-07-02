@@ -40,7 +40,28 @@ class CustomRPC(Presence):
         self.time_left = None
         self.toaster = ToastNotifier()
         self.exclusions = ["svchost.exe"] #Clean up program list. Kinda uncessary but probably saves ram.
-        self.image_list = ["kitty", "chicken", "chickies", "chub", "kitty2", "kitty3", "kitty4", "sleepy", "kitty5", "kitty6", "kitty7"] #The images available to the script
+        self.image_list = [
+            "kitty", "chicken", "chickies", "chub", "kitty2", 
+            "kitty3", "kitty4", "sleepy", "kitty5", "kitty6", "kitty7"] #The images available to the script
+        self.game_icons = {
+            "Battlefield 1": "bf1",
+            "Call of Duty: Black Ops": "bo1",
+            "Call of Duty: Black Ops - Multiplayer": "bo1m",
+            "Counter-Strike: Global Offensive": "csgo",
+            "Fortnite": "fortnite",
+            "Forza Horizon 4": "forza",
+            "Golf With Your Friends": "golf",
+            "GTA V": "gta",
+            "Minecraft": "minecraft",
+            "Mirror's Edge Catalyst": "mirrors_edge",
+            "Mercy Time on Overwatch": "ow",
+            "Rocket League": "rocket",
+            "Rainbow Six Seige": "seige",
+            "Valorant": "valorant",
+            "VirtualBox VM": "vbox",
+            "VSCode": "vscode",
+            "Warframe": "warframe",
+        }
         self.music_file = f"{self.root}\\..\\..\\rainmeter skin\\@Resources\\music.txt"
         self.isConnected = False
         self.lastUpdateTime = 0
@@ -95,7 +116,9 @@ class CustomRPC(Presence):
                 details=self.details,
                 end=self.time_left,
                 large_image=choice(self.image_list),
-                large_text=self.large_text
+                large_text=self.large_text,
+                small_image=self.small_image,
+                small_text=self.small_text
             ) #Set status and store for terminal output
         else:
             output = self.update(
@@ -103,7 +126,9 @@ class CustomRPC(Presence):
                 details=self.details,
                 start=self.time_left,
                 large_image=choice(self.image_list),
-                large_text=self.large_text
+                large_text=self.large_text,
+                small_image=self.small_image,
+                small_text=self.small_text
             ) #Set status and store for terminal output
         self.lastUpdateTime = time()
         timestamps = ""
@@ -193,6 +218,8 @@ class CustomRPC(Presence):
 
         if config["enable_games"] == True:
             self.details = config["default_details"] #Below code doesn't change anything if no process in gamelist is running. Wasn't an issue when not using OOP. Simplest fix, rather than making a boolean or similar
+            self.small_image = None
+            self.small_text = None
             try:
                 with open(f"{environ['LOCALAPPDATA']}\\customrpc\\gamelist.json") as g:
                     gamelist = j_load(g) #Read the json gamelist into the json library
@@ -213,6 +240,11 @@ class CustomRPC(Presence):
                     timeactive_listed = list(filter(None, timeactive)) #Forget what this does, looks important
                     if timeactive_listed[0] != "Days:0": #Some programs do not record how long they have been running for. Catch this and just say the game name
                         self.details = f"Playing {realname}"
+                        try:
+                            self.small_image = self.game_icons[realname]
+                        except KeyError:
+                            self.small_image = None
+                        self.small_text = realname
                     else: #Otherwise...
                         d = {}
                         for line in timeactive_listed:
@@ -224,15 +256,32 @@ class CustomRPC(Presence):
                         if d["Hours"] == "0": #Don't bother displaying hours if its 0
                             if d["Minutes"] == "0": #For better looks, hide time for the first minute the process has been running for
                                 self.details = f"Playing {realname}" 
+                                try:
+                                    self.small_image = self.game_icons[realname]
+                                except KeyError:
+                                    self.small_image = None
+                                self.small_text = realname
                                 break
                             else: #Show just the minutes
                                 self.details = f"Playing {realname} for {d['Minutes']}m"
+                                try:
+                                    self.small_image = self.game_icons[realname]
+                                except KeyError:
+                                    self.small_image = None
+                                self.small_text = realname
                                 break
                         else: #Otherwise display hours and minutes
                             self.details = f"Playing {realname} for {d['Hours']}h:{d['Minutes']}m"
+                            try:
+                                self.small_image = self.game_icons[realname]
+                            except KeyError:
+                                self.small_image = None
+                            self.small_text = realname
                             break
         else:
             self.details = config["default_details"]
+            self.small_image = None
+            self.small_text = None
 
         if config["enable_media"] == True:
             if "vlc.exe" in programlist.keys(): #Check if vlc is running
