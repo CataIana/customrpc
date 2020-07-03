@@ -156,6 +156,7 @@ class CustomRPC(Presence):
         while self.isRunning:
             if self.isConnected:
                 prev_state, prev_details, prev_large_text, prev_time_left = self.state, self.details, self.large_text, self.time_left #Store previous state/details
+                self.getVariables()
                 f = True
                 while self.state == prev_state and self.details == prev_details and self.large_text == prev_large_text and self.compareTimes(self.time_left, prev_time_left): #If variables haven't changed don't bother sending requests to discord.
                     if f:
