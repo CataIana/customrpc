@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QLineEdit, QWidget, QSystemTrayIcon, QMenu
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QLineEdit, QWidget, QSystemTrayIcon, QMenu, QComboBox
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtCore import Qt, QEvent
 import qdarkstyle
@@ -28,7 +28,8 @@ class MainWindow(QMainWindow):
         self.log = getLogger("DEBUG")
 
         #Run checks before starting
-        self.checks()
+        if self.runRPC:
+            self.checks()
 
         #Set variables
         self.variables()
@@ -90,6 +91,7 @@ class MainWindow(QMainWindow):
         self.clientIDLayout = QHBoxLayout()
         self.stateLayout = QHBoxLayout()
         self.detailsLayout = QHBoxLayout()
+        self.defaultOptionsLayout = QHBoxLayout()
         self.largeTextLayout = QHBoxLayout()
         self.optionsLayout = QHBoxLayout()
         self.options2Layout = QHBoxLayout()
@@ -125,6 +127,7 @@ class MainWindow(QMainWindow):
         self.clientIDLayout.addWidget(self.clientIDButton)
 
         #Set extra data
+        self.clientIDInput.returnPressed.connect(self.clientIDButton.click)
         self.clientIDButton.clicked.connect(self.updateClientID)
 
         #Add layout
@@ -143,6 +146,7 @@ class MainWindow(QMainWindow):
         self.stateLayout.addWidget(self.stateButton)
 
         #Set extra data
+        self.stateInput.returnPressed.connect(self.stateButton.click)
         self.stateButton.clicked.connect(self.updateState)
 
         #Add layout
@@ -161,10 +165,40 @@ class MainWindow(QMainWindow):
         self.detailsLayout.addWidget(self.detailsButton)
 
         #Set extra data
+        self.detailsInput.returnPressed.connect(self.detailsButton.click)
         self.detailsButton.clicked.connect(self.updateDetails)
 
         #Add layout
         self.mainLayout.addLayout(self.detailsLayout)
+
+        ##################################################################
+
+        #Objects
+        defaultOptionsLabel = QLabel("Default Options:")
+        self.defaultOptionsList = QComboBox()
+        self.defaultOptionsButton = QPushButton(self.updateText)
+
+        #Add widgets
+        self.defaultOptionsLayout.addWidget(defaultOptionsLabel)
+        self.defaultOptionsLayout.addWidget(self.defaultOptionsList)
+        self.defaultOptionsLayout.addWidget(self.defaultOptionsButton)
+
+        #Set extra data
+        self.defaultOptionsList.addItems(
+            [
+                "Time",
+                "Weather",
+                "Use Text",
+                "Rotating"
+            ]
+        )
+        index = self.defaultOptionsList.findText(config["default_option"], Qt.MatchFixedString)
+        self.defaultOptionsList.setCurrentIndex(index)
+        self.defaultOptionsButton.clicked.connect(self.updateDefaultOptions)
+        self.defaultOptionsButton.adjustSize()
+
+        #Add layout
+        self.mainLayout.addLayout(self.defaultOptionsLayout)
 
         ##################################################################
 
@@ -179,6 +213,7 @@ class MainWindow(QMainWindow):
         self.largeTextLayout.addWidget(self.largeTextButton)
 
         #Set extra data
+        self.largeTextInput.returnPressed.connect(self.largeTextButton.click)
         self.largeTextButton.clicked.connect(self.updateLargeText)
 
         #Add layout
@@ -250,7 +285,7 @@ class MainWindow(QMainWindow):
         self.mainWidget.setLayout(self.mainLayout)
 
         self.setCentralWidget(self.mainWidget)
-        self.setFixedSize(400, 280) #Set window dimensions
+        self.setFixedSize(400, 320) #Set window dimensions
         self.trayIcon.show()
 
     def updateClientID(self):
@@ -311,6 +346,13 @@ class MainWindow(QMainWindow):
         self.info.setText(result)
         if b:
             self.updateConfig(config)
+
+    def updateDefaultOptions(self):
+        config = self.readConfig()
+        config["default_option"] = self.defaultOptionsList.currentText()
+        self.log.info(f"Set default option to {config['default_option']}")
+        self.info.setText(f"Set default option to {config['default_option']}")
+        self.updateConfig(config)
 
     def updateLargeText(self):
         new_large_text = self.largeTextInput.text()
@@ -374,7 +416,8 @@ class MainWindow(QMainWindow):
     def exit(self):
         self.trayIcon.hide()
         self.hide()
-        remove(f"{environ['USERPROFILE']}\\rpc.pid")
+        if self.runRPC:
+            remove(f"{environ['USERPROFILE']}\\rpc.pid")
         self.log.info("Exiting...")
         sys.exit()
 
@@ -384,6 +427,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self.log.info("Close event")
         event.ignore()
+        self.info.setText("")
         self.hide()
     
     def changeEvent(self, event):
@@ -391,6 +435,7 @@ class MainWindow(QMainWindow):
             if self.windowState() & Qt.WindowMinimized:
                 event.ignore()
                 self.log.info("Minimize event")
+                self.info.setText("")
                 self.hide()
     
     def trayClicked(self, event):
@@ -433,9 +478,13 @@ class MainWindow(QMainWindow):
         self.updateConfig(config)
 
     def restartRPC(self):
-        self.log.info("Restarting RPC")
-        self.rpc.stop()
-        self.initRPC()
+        if self.runRPC:
+            self.log.info("Restarting RPC")
+            self.rpc.stop()
+            self.initRPC()
+        else:
+            self.log.info("RPC is not enabled! Cannot restart.")
+            self.info.setText("RPC is not enabled! Cannot restart.")
 
     def initRPC(self):
         config = self.readConfig()

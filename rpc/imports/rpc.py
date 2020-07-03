@@ -6,11 +6,13 @@ from random import choice
 from win10toast import ToastNotifier
 
 import sys
+from datetime import datetime
 from time import time
 from os import environ, path, getcwd, mkdir
 from subprocess import Popen, PIPE
 from json import load as j_load
 from json import dumps as j_print
+from json import loads as j_loadstr
 
 from requests import Session
 from requests.exceptions import ConnectionError
@@ -66,8 +68,16 @@ class CustomRPC(Presence):
         self.isConnected = False
         self.lastUpdateTime = 0
         self.errored = False
+        self.rollingIndexDetails = 0
+        self.rollingIndexState = 0
+        self.rollingOptions = [
+            "Time",
+            "Weather",
+            "Use Text"
+        ]
 
         self.rSession = Session()
+        self.fetchWeather()
 
         self.isRunning = True
 
@@ -102,8 +112,8 @@ class CustomRPC(Presence):
     def updateRPC(self, wait=True): #Not sure why this didn't happen sooner, but set the details straight away, rather than waiting for a change.
         self.getVariables()
         config = self.readConfig()
-        if (self.lastUpdateTime + 15) > time() and self.lastUpdateTime != 0: #This is a workaround for at the start of the code execution. Because the __init__ of this needs to finish,
-            initSleep = (self.lastUpdateTime + 15) - time() #before the UI part will start working we must skip the sleep, otherwise the program will not progress until that sleep completes. This is the use of the wait variable at the bottom of this function
+        if (self.lastUpdateTime + 14) > time() and self.lastUpdateTime != 0: #This is a workaround for at the start of the code execution. Because the __init__ of this needs to finish,
+            initSleep = (self.lastUpdateTime + 14) - time() #before the UI part will start working we must skip the sleep, otherwise the program will not progress until that sleep completes. This is the use of the wait variable at the bottom of this function
             self.log.debug(f"Init sleeping for {initSleep}") #This loop is then put into action immediately after without waiting, which is an issue, as the RPC is set after about 2 seconds, which discord will accept, but it should only be set every 15 seconds
             loop = QEventLoop()
             QTimer.singleShot(initSleep*1000, loop.quit)
@@ -131,6 +141,8 @@ class CustomRPC(Presence):
                 small_text=self.small_text
             ) #Set status and store for terminal output
         self.lastUpdateTime = time()
+        self.rollingIndexDetails += 1
+        self.rollingIndexState += 1
         timestamps = ""
         for x, y in output["data"]["timestamps"].items():
             timestamps += f"{x}: {y}, ".strip(", ")
@@ -144,7 +156,6 @@ class CustomRPC(Presence):
         while self.isRunning:
             if self.isConnected:
                 prev_state, prev_details, prev_large_text, prev_time_left = self.state, self.details, self.large_text, self.time_left #Store previous state/details
-                self.getVariables() #Get variables
                 f = True
                 while self.state == prev_state and self.details == prev_details and self.large_text == prev_large_text and self.compareTimes(self.time_left, prev_time_left): #If variables haven't changed don't bother sending requests to discord.
                     if f:
@@ -199,12 +210,12 @@ class CustomRPC(Presence):
                     else:
                         self.time_left = int(time() - position)
                 else:
-                    self.state = config["default_state"] #If music is not playing let details be the default setting
+                    self.state = self.getDefaults("state") #If music is not playing let details be the default setting
                     self.time_left = None
             except IndexError: #Rainmeter rewrites to the music.txt file multiple times per second, and python may catch the text file with nothing in it.
                 pass #Prevents errors that may occur every few hours. Holy shit this took a long time to diagnose
         else:
-            self.state = config["default_state"] #If user disabled showing media, let state be default
+            self.state = self.getDefaults("state") #If user disabled showing media, let state be default
             self.time_left = None #When setting state, always set time_left
 
         if config["enable_games"] == True or config["enable_media"] == True:
@@ -217,7 +228,7 @@ class CustomRPC(Presence):
                         programlist[program[0]] = program[1] #Add process and process id to dictionary
 
         if config["enable_games"] == True:
-            self.details = config["default_details"] #Below code doesn't change anything if no process in gamelist is running. Wasn't an issue when not using OOP. Simplest fix, rather than making a boolean or similar
+            self.details = self.getDefaults("details") #Below code doesn't change anything if no process in gamelist is running. Wasn't an issue when not using OOP. Simplest fix, rather than making a boolean or similar
             self.small_image = None
             self.small_text = None
             try:
@@ -279,7 +290,7 @@ class CustomRPC(Presence):
                             self.small_text = realname
                             break
         else:
-            self.details = config["default_details"]
+            self.details = self.getDefaults("details")
             self.small_image = None
             self.small_text = None
 
@@ -346,3 +357,55 @@ class CustomRPC(Presence):
         self.clear()
         self.close()
         self.isRunning = False
+
+    def getDefaults(self, type_, config_override=None):
+        if config_override == None:
+            config = self.readConfig()
+        else:
+            config = config_override
+        if type_ == "details":
+            if config["default_option"] == "Time":
+                return "Sydney, Australia 🇦🇺"
+            if config["default_option"] == "Weather":
+                return "Sydney, Australia 🇦🇺"
+            if config["default_option"] == "Use Text":
+                return config["default_details"]
+            if config["default_option"] == "Rotating":
+                if self.rollingIndexDetails > self.rollingOptions.__len__()-1:
+                    self.rollingIndexDetails = 0
+                config["default_option"] = self.rollingOptions[self.rollingIndexDetails]
+                return self.getDefaults(type_, config)
+        if type_ == "state":
+            if config["default_option"] == "Time":
+                return f"{datetime.now():%Y-%m-%d %I:%M %p}"
+            if config["default_option"] == "Weather":
+                return f"Currently {self.getWeather('temp')}°C degrees"
+            if config["default_option"] == "Use Text":
+                return config["default_state"]
+            if config["default_option"] == "Rotating":
+                if self.rollingIndexState > self.rollingOptions.__len__()-1:
+                    self.rollingIndexState = 0
+                config["default_option"] = self.rollingOptions[self.rollingIndexState]
+                return self.getDefaults(type_, config)
+        return "None"
+
+    def getWeather(self, request):
+        if self.weather_json["time"]+900 < int(time()):
+            self.fetchWeather()
+        
+        if self.weather_json["cod"] == 200:
+            if request == "temp":
+                return f"{(self.weather_json['main']['temp'] - 273.15):.2f}"
+            else:
+                return None
+        else:
+            return None
+
+    def fetchWeather(self):
+        city_id = "2147714"
+        api_key = "23acbaf2250474acbe34f76ffc375b0f"
+        rw = self.rSession.get(f"https://api.openweathermap.org/data/2.5/weather?id={city_id}&appid={api_key}")
+        self.weather_json = j_loadstr(rw.text)
+        self.weather_json["time"] = int(time())
+        self.log.info("Requesting weather info")
+        
