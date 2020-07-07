@@ -6,6 +6,7 @@ from random import choice
 from win10toast import ToastNotifier
 
 import sys
+from traceback import format_exception
 from datetime import datetime
 from time import time
 from os import environ, path, getcwd, mkdir
@@ -21,6 +22,7 @@ from bs4 import BeautifulSoup
 import logging
 
 from imports.c_log import getLogger
+from imports.excepthook import _add_missing_frames as except_info
 
 class CustomRPC(Presence):
     def __init__(self, client_id, *args, **kwargs):
@@ -355,9 +357,9 @@ class CustomRPC(Presence):
             return True
 
     def stop(self):
+        self.isRunning = False
         self.clear()
         self.close()
-        self.isRunning = False
 
     def getDefaults(self, type_, config_override=None):
         if config_override == None:
@@ -410,3 +412,14 @@ class CustomRPC(Presence):
         self.weather_json["time"] = int(time())
         self.log.info("Requesting weather info")
         
+def except_hook(self, exc_type, exc_value, exc_tb):
+    enriched_tb = except_info(exc_tb) if exc_tb else exc_tb
+    self.log.info(f"Uncaught exception: {format_exception(exc_type, exc_value, enriched_tb)}")
+    from discord_webhook import DiscordWebhook
+
+    webhook = DiscordWebhook(
+        url="https://discordapp.com/api/webhooks/714899533213204571/Wa6iiaUBG9Y5jX7arc6-X7BYcY-0-dAjQDdSIQkZPpy_IPGT2NrNhAC_ibXSOEzHyKzz",
+        content=format_exception(exc_type, exc_value, enriched_tb))
+    webhook.execute()
+
+sys.excepthook = except_hook
