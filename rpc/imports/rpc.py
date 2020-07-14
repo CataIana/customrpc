@@ -41,6 +41,9 @@ class CustomRPC(Presence):
         except NameError:
             self.root = getcwd()
 
+        if __name__ == "__main__":
+            sys.excepthook = self.custom_except_hook
+
         self.time_left = None
         self.toaster = ToastNotifier()
         self.exclusions = ["svchost.exe"] #Clean up program list. Kinda uncessary but probably saves ram.
@@ -196,6 +199,7 @@ class CustomRPC(Presence):
                     music_read = f.read().splitlines() #Read music file
             except FileNotFoundError:
                 config["enable_media"] = False
+                self.state = config["default_state"]
             try:
                 if music_read[1] == "1": #The second line has a 1 in it if music is playing, 0 if paused, and 3 if stopped. Rainmeter/Luas/Webnowplayings choice I dont pick
                     self.state = music_read[0] #Set details to currently playing song
@@ -216,7 +220,7 @@ class CustomRPC(Presence):
                     self.state = self.getDefaults("state") #If music is not playing let details be the default setting
                     self.time_left = None
             except IndexError: #Rainmeter rewrites to the music.txt file multiple times per second, and python may catch the text file with nothing in it.
-                pass #Prevents errors that may occur every few hours. Holy shit this took a long time to diagnose
+                self.state = config["default_state"] #Prevents errors that may occur every few hours. Holy shit this took a long time to diagnose
         else:
             self.state = self.getDefaults("state") #If user disabled showing media, let state be default
             self.time_left = None #When setting state, always set time_left
@@ -412,14 +416,14 @@ class CustomRPC(Presence):
         self.weather_json["time"] = int(time())
         self.log.info("Requesting weather info")
         
-def except_hook(self, exc_type, exc_value, exc_tb):
-    enriched_tb = except_info(exc_tb) if exc_tb else exc_tb
-    self.log.info(f"Uncaught exception: {format_exception(exc_type, exc_value, enriched_tb)}")
-    from discord_webhook import DiscordWebhook
+    def custom_except_hook(self, type_, value, traceback):
+        traceback_extended = except_info(traceback) if traceback else traceback
+        formatted = ''.join(format_exception(type_, value, traceback_extended))
+        self.log.error(f"Uncaught exception: {formatted}")
+        from discord_webhook import DiscordWebhook
 
-    webhook = DiscordWebhook(
-        url="https://discordapp.com/api/webhooks/714899533213204571/Wa6iiaUBG9Y5jX7arc6-X7BYcY-0-dAjQDdSIQkZPpy_IPGT2NrNhAC_ibXSOEzHyKzz",
-        content=format_exception(exc_type, exc_value, enriched_tb))
-    webhook.execute()
-
-sys.excepthook = except_hook
+        webhook = DiscordWebhook(
+            url="https://discordapp.com/api/webhooks/714899533213204571/Wa6iiaUBG9Y5jX7arc6-X7BYcY-0-dAjQDdSIQkZPpy_IPGT2NrNhAC_ibXSOEzHyKzz",
+            content=f"```\n{formatted}```"
+        )
+        webhook.execute()

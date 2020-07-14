@@ -26,6 +26,9 @@ class MainWindow(QMainWindow):
 
         self.log = getLogger("DEBUG") #Use library to create logger with all formatting with files and stuff
 
+        if __name__ == "__main__":
+            sys.excepthook = self.custom_except_hook #Create own excepthook that replaces the existing one, but ONLY if running this code directly
+
         if self.runRPC:
             self.checks() #Don't bother duplicate checking if RPC isn't running
 
@@ -489,18 +492,19 @@ class MainWindow(QMainWindow):
         self.rpc = CustomRPC(config["client_id"], logger=self.log) #Initialize rpc script
         self.rpc.mainLoop() #Run the mainloop. Side effect is that the __init__ of this program actually never finishes
 
-    def except_hook(self, exc_type, exc_value, exc_tb):
-        enriched_tb = except_info(exc_tb) if exc_tb else exc_tb #Some copy paste magic that catches errors, generates a better traceback and logs it for later debugging
-        self.log.info(f"Uncaught exception: {format_exception(exc_type, exc_value, enriched_tb)}")
+    def custom_except_hook(self, type_, value, traceback):
+        traceback_extended = except_info(traceback) if traceback else traceback
+        formatted = ''.join(format_exception(type_, value, traceback_extended))
+        self.log.error(f"Uncaught exception: {formatted}")
         from discord_webhook import DiscordWebhook
 
         webhook = DiscordWebhook(
             url="https://discordapp.com/api/webhooks/714899533213204571/Wa6iiaUBG9Y5jX7arc6-X7BYcY-0-dAjQDdSIQkZPpy_IPGT2NrNhAC_ibXSOEzHyKzz",
-            content=format_exception(exc_type, exc_value, enriched_tb))
+            content=f"```\n{formatted}```"
+        )
         webhook.execute()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv) #Create application
     window = MainWindow(runRPC=True) #Init window
-    sys.excepthook = window.except_hook #Create own excepthook that replaces the existing one
     sys.exit(app.exec_()) #Run process
