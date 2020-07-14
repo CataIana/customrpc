@@ -1,7 +1,7 @@
 import logging
 from os import path, getcwd
 
-def getLogger(level):
+def getLogger(self, level):
     log = logging.getLogger("RPC UI")
     log.setLevel(level)
 
@@ -9,17 +9,13 @@ def getLogger(level):
 
     ch = logging.StreamHandler()
     ch.setLevel(level)
-    
+
     ch.setFormatter(formatter)
     log.addHandler(ch)
-    
-    try:
-        root = path.dirname(path.realpath(__file__))
-    except NameError:
-        root = getcwd()
-    fh = logging.FileHandler(f"{root}\\..\\log.log", "a+", "utf-8")
+
+    fh = logging.FileHandler(f"{self.root}\\log.log", "a+", "utf-8")
     fh.setLevel(level)
-    
+
     fh.setFormatter(formatter)
     log.addHandler(fh)
     return log

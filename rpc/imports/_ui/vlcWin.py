@@ -1,7 +1,9 @@
-from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QLineEdit, QWidget, QSystemTrayIcon, QMenu
-from PyQt5.QtGui import QIcon, QFont
+from PyQt5.QtWidgets import (
+    QMainWindow, QLabel, QPushButton, QVBoxLayout, QLineEdit, QWidget)
+from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 import qdarkstyle
+
 
 class VLCPasswordWindow(QMainWindow):
     def __init__(self, parent):
@@ -37,7 +39,7 @@ class VLCPasswordWindow(QMainWindow):
         self.mainWidget.setFont(self.parent.font)
         self.mainWidget.setLayout(self.mainLayout)
         self.setCentralWidget(self.mainWidget)
-        
+
         self.setFixedSize(300, 150)
 
     def setPassword(self):

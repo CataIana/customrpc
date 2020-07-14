@@ -11,6 +11,7 @@ py_file = "ui.py"
 donotremove = [
     py_file,
     "imports",
+    "rpc icons",
     path.basename(__file__)
 ]
 output = Popen(["taskkill", "/im", f"{exe_name}.exe", "/f"], stdout=PIPE)

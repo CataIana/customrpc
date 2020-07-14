@@ -1,4 +1,3 @@
-from imports.rpc import CustomRPC
-from imports.c_log import getLogger
-from imports.vlcWin import VLCPasswordWindow
-from imports.excepthook import _add_missing_frames as except_info
+from ._shared_imports import *
+from ._ui import *
+from .rpc import CustomRPC
