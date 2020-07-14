@@ -6,13 +6,14 @@ def customExceptHook(self, type_, value, traceback):
     traceback_extended = _add_missing_frames(traceback) if traceback else traceback
     formatted = ''.join(format_exception(type_, value, traceback_extended))
     self.log.error(f"Uncaught exception: {formatted}")
-
-    if self.stderr_webhook:
-        webhook = DiscordWebhook(
-            url="https://discordapp.com/api/webhooks/714899533213204571/Wa6iiaUBG9Y5jX7arc6-X7BYcY-0-dAjQDdSIQkZPpy_IPGT2NrNhAC_ibXSOEzHyKzz",
-            content=f"```python\n{formatted}```"
-        )
-        webhook.execute()
+    config = self.readConfig()
+    if config["webhook_url"] != "":
+        if self.stderr_webhook:
+            webhook = DiscordWebhook(
+                url=config["webhook_url"],
+                content=f"```python\n{formatted}```"
+            )
+            webhook.execute()
 
 def _add_missing_frames(tb):
     result = fake_tb(tb.tb_frame, tb.tb_lasti, tb.tb_lineno, tb.tb_next)

@@ -20,7 +20,8 @@ def readConfig(self):
             "enable_games": True,
             "enable_media": True,
             "use_time_left": True,
-            "vlc_pwd": ""
+            "vlc_pwd": "",
+            "webhook_url": ""
         }
         if not path.isdir(f"{environ['LOCALAPPDATA']}\\customrpc"):
             mkdir(f"{environ['LOCALAPPDATA']}\\customrpc") #Create customrpc folder if it doesn't exist

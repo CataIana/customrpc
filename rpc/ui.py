@@ -98,5 +98,5 @@ if __name__ == "__main__":
         options = {"False": False, "True": True}
         if sys.argv[1].capitalize() in ["False", "True"]:
             runRPC = options[sys.argv[1].capitalize()]
-    window = MainWindow(runRPC=runRPC, errorsToWebhook=False) #Init window
+    window = MainWindow(runRPC=runRPC, errorsToWebhook=True) #Init window
     sys.exit(app.exec_()) #Run process
