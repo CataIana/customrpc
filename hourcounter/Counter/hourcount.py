@@ -16,7 +16,7 @@ class RPCHourCount():
             self.root = path.dirname(path.realpath(__file__))
         except NameError:
             self.root = getcwd()
-        self.music_file = f"{self.root}\\..\\rainmeter skin\\@Resources\\music.txt"
+        self.music_file = f"{self.root}\\..\\..\\rainmeter skin\\@Resources\\music.txt"
         self.open_processes = {}
         self.exclusions = ["svchost.exe"]
 
@@ -68,23 +68,21 @@ class RPCHourCount():
                 g.write(j_print(hourcount, indent=4))
 
     def active_dict(self, pid):
-        proc = Popen(f"powershell New-TimeSpan -Start (get-process -id {pid}).StartTime", shell=True, stdout=PIPE)
-        timeactive = []
-        for line in proc.stdout:
-            timeactive.append(line.decode().rstrip().replace(" ", ""))
-        try:
-            if timeactive[0] == f"get-process:Cannotfindaprocesswiththeprocessidentifier{pid}.":
-                return "None"
-        except IndexError as e:
-            self.log.critical(e)
-            self.log.critical(str(timeactive))
         d = {}
-        for line in list(filter(None, timeactive)):
-            d[line.split(":")[0]] = line.split(":")[1]
-        try:
-            return d["TotalHours"]
-        except KeyError:
-            raise KeyError(d)
+        timeactive = []
+        while d == {} or timeactive == []:
+            proc = Popen(f"powershell New-TimeSpan -Start (get-process -id {pid}).StartTime", shell=True, stdout=PIPE)
+            for line in proc.stdout:
+                timeactive.append(line.decode().rstrip().replace(" ", ""))
+            try:
+                if timeactive[0] == f"get-process:Cannotfindaprocesswiththeprocessidentifier{pid}.":
+                    return "None"
+            except IndexError as e:
+                self.log.critical(e)
+                self.log.critical(str(timeactive))
+            for line in list(filter(None, timeactive)):
+                d[line.split(":")[0]] = line.split(":")[1]
+        return d["TotalHours"]
 
     def close_loop(self):
         self.program_loop()
@@ -97,7 +95,7 @@ class RPCHourCount():
                 for x, y in gamelist.items():
                     if x == active_process:
                         realname = y
-                self.add_to_database(realname=realname, totalhrs=self.open_processes[active_process])
+                        self.add_to_database(realname=realname, totalhrs=self.open_processes[active_process])
                 toremove.append(active_process)
         if toremove.__len__() > 0:
             for remove in toremove:
