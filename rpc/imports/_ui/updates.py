@@ -81,3 +81,14 @@ def updateLargeText(self):
     self.info.setText(result)
     if b:
         self.updateConfig(config)
+
+def updateTwitchReplacement(self):
+    new_twitch_replacement = self.twitchReplaceInput.text()
+    config = self.readConfig()
+    b = True
+    config["twitch_replacement"] = new_twitch_replacement
+    result = f"Set twitch replacement text to {config['twitch_replacement']}"
+    self.log.info(f"Set twitch replacement text to {config['twitch_replacement']}")
+    self.info.setText(result)
+    if b:
+        self.updateConfig(config)

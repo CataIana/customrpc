@@ -1,3 +1,4 @@
+import sys
 from time import time
 from datetime import datetime
 from os import environ, path, mkdir
@@ -30,6 +31,8 @@ def getVariables(self):
                         duration += int(duration_read[i])*(60**i)
                     for i in range(len(position_read)-1, -1, -1):
                         position += int(position_read[i])*(60**i)
+                    if self.state == "Twitch - Twitch":
+                        self.state = config["twitch_replacement"]
                     #Calculate the difference between the 2 times and set time left to how long that is plus the current time
                     if config["use_time_left"] == True:
                         self.time_left = time() + (duration - position)
@@ -58,61 +61,66 @@ def getVariables(self):
                 g.write("{\n}")
             with open(f"{environ['LOCALAPPDATA']}\\customrpc\\gamelist.json") as g:
                 gamelist = j_load(g) #Read the json gamelist into the json library
-        programlist = fetchProgramList(self.exclusions)
-        for exe, realname in gamelist.items(): #Iterate through the gamelist and find a matching process that is running
-            if exe in list(programlist.keys()): #Checks through programlist's keys
-                timeactive = []
-                while timeactive.__len__() < 1:
-                    proc = Popen(["powershell", f"New-TimeSpan -Start (get-process -id {programlist[exe]}).StartTime"], shell=True, stdout=PIPE) #If found, find how long that process has been running for
-                    for line in proc.stdout:
-                        timeactive.append(line.decode().rstrip().replace(" ", ""))
-                timeactive_listed = list(filter(None, timeactive)) #Forget what this does, looks important
-                if timeactive_listed[0] != "Days:0": #Some programs do not record how long they have been running for. Catch this and just say the game name
-                    self.details = f"Playing {realname}"
-                    try:
-                        self.small_image = self.game_icons[realname]
-                    except KeyError:
-                        self.small_image = None
-                    self.small_text = realname
-                else: #Otherwise...
-                    d = {}
-                    for line in timeactive_listed:
-                        try:
-                            d[line.split(":")[0]] = line.split(":")[1] #Convert the powershell output into a dictionary, due to its dict-like output
-                        except IndexError:
-                            self.large_text = config["large_text"]
-                            return
-                    if d["Hours"] == "0": #Don't bother displaying hours if its 0
-                        if d["Minutes"] == "0": #For better looks, hide time for the first minute the process has been running for
-                            self.details = f"Playing {realname}" 
-                            try:
-                                self.small_image = self.game_icons[realname]
-                            except KeyError:
-                                self.small_image = None
-                            self.small_text = realname
-                            break
-                        else: #Show just the minutes
-                            self.details = f"Playing {realname} for {d['Minutes']}m"
-                            try:
-                                self.small_image = self.game_icons[realname]
-                            except KeyError:
-                                self.small_image = None
-                            self.small_text = realname
-                            break
-                    else: #Otherwise display hours and minutes
-                        self.details = f"Playing {realname} for {d['Hours']}h:{d['Minutes']}m"
+        try:
+            programlist = fetchProgramList(self.exclusions)
+            for exe, realname in gamelist.items(): #Iterate through the gamelist and find a matching process that is running
+                if exe in list(programlist.keys()): #Checks through programlist's keys
+                    timeactive = []
+                    while timeactive.__len__() < 1:
+                        proc = Popen(["powershell", f"New-TimeSpan -Start (get-process -id {programlist[exe]}).StartTime"], shell=True, stdout=PIPE) #If found, find how long that process has been running for
+                        for line in proc.stdout:
+                            timeactive.append(line.decode().rstrip().replace(" ", ""))
+                    self.log.debug(timeactive)
+                    timeactive_listed = list(filter(None, timeactive)) #Forget what this does, looks important
+                    if timeactive_listed[0] != "Days:0": #Some programs do not record how long they have been running for. Catch this and just say the game name
+                        self.details = f"Playing {realname}"
                         try:
                             self.small_image = self.game_icons[realname]
                         except KeyError:
                             self.small_image = None
                         self.small_text = realname
-                        break
+                    else: #Otherwise...
+                        d = {}
+                        for line in timeactive_listed:
+                            try:
+                                d[line.split(":")[0]] = line.split(":")[1] #Convert the powershell output into a dictionary, due to its dict-like output
+                            except IndexError:
+                                self.large_text = config["large_text"]
+                                return
+                        if d["Hours"] == "0": #Don't bother displaying hours if its 0
+                            if d["Minutes"] == "0": #For better looks, hide time for the first minute the process has been running for
+                                self.details = f"Playing {realname}" 
+                                try:
+                                    self.small_image = self.game_icons[realname]
+                                except KeyError:
+                                    self.small_image = None
+                                self.small_text = realname
+                                break
+                            else: #Show just the minutes
+                                self.details = f"Playing {realname} for {d['Minutes']}m"
+                                try:
+                                    self.small_image = self.game_icons[realname]
+                                except KeyError:
+                                    self.small_image = None
+                                self.small_text = realname
+                                break
+                        else: #Otherwise display hours and minutes
+                            self.details = f"Playing {realname} for {d['Hours']}h:{d['Minutes']}m"
+                            try:
+                                self.small_image = self.game_icons[realname]
+                            except KeyError:
+                                self.small_image = None
+                            self.small_text = realname
+                            break
+        except Exception as e:
+            self.log.critical(e)
+            sys.exit()
     else:
         self.details = self.getDefaults("details")
         self.small_image = None
         self.small_text = None
 
-    if config["enable_media"] == True:
+    if config["enable_media"] == True and config["vlc_pwd"] != "":
         programlist = fetchProgramList(self.exclusions)
         if "vlc.exe" in programlist.keys(): #Check if vlc is running
             self.rSession.auth = ("", config["vlc_pwd"]) #Login to vlc client. See https://www.howtogeek.com/117261/how-to-activate-vlcs-web-interface-control-vlc-from-a-browser-use-any-smartphone-as-a-remote/

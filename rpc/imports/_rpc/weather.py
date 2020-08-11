@@ -1,22 +1,44 @@
 from time import time
 from json import loads as j_loadstr
+from requests.exceptions import ConnectionError
+
 
 def getWeather(self, request):
     if self.weather_json["time"]+900 < int(time()):
         self.fetchWeather()
-    
-    if self.weather_json["cod"] == 200:
+
+    try:
         if request == "temp":
-            return f"{(self.weather_json['main']['temp'] - 273.15):.2f}"
+            return round(self.weather_json['current']['temp'], 1)
         else:
             return None
-    else:
+    except KeyError:
         return None
 
+
 def fetchWeather(self):
-    city_id = "2147714"
-    api_key = "23acbaf2250474acbe34f76ffc375b0f"
-    rw = self.rSession.get(f"https://api.openweathermap.org/data/2.5/weather?id={city_id}&appid={api_key}")
-    self.weather_json = j_loadstr(rw.text)
-    self.weather_json["time"] = int(time())
-    self.log.info("Requesting weather info")
+    lat = "-33.8426359"
+    lon = "150.8306575"
+    config = self.readConfig()
+    self.weather_api_key = config["weather_api_key"]
+    if self.weather_api_key != "":
+        self.log.info("Requesting weather info")
+        try:
+            rw = self.rSession.get(
+                f"https://api.openweathermap.org/data/2.5/onecall?lat={lat}&lon={lon}&units=metric&exclude=minutely,hourly,daily&appid={self.weather_api_key}")
+        except ConnectionError:
+            self.log.error("Failed to request weather info!")
+            self.weather_json = {}
+            self.weather_json["cod"] = 0
+            self.weather_json["time"] = int(time()-860)
+            return
+        else:
+            self.weather_json = j_loadstr(rw.text)
+            self.weather_json["time"] = int(time())
+            return
+    else:
+        self.log.error("API Key not provided for weather.")
+        self.weather_json = {}
+        self.weather_json["cod"] = 0
+        self.weather_json["time"] = int(time()-860)
+        return

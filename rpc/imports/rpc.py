@@ -13,7 +13,7 @@ class CustomRPC(Presence):
     from ._rpc import variables, getVariables, getDefaults, getWeather, fetchWeather
     from ._rpc import reconnect, updateRPC
 
-    def __init__(self, client_id, *args, **kwargs):
+    def __init__(self, client_id, **kwargs):
         try:
             self.root = path.dirname(path.realpath(__file__))
         except NameError:
@@ -75,7 +75,8 @@ class CustomRPC(Presence):
         except TypeError:
             return True
     
-    def readConfig(self=None):
+    @staticmethod
+    def readConfig():
         with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f:
             return j_load(f)
 

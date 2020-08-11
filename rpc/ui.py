@@ -13,7 +13,7 @@ class MainWindow(QMainWindow):
     from imports._ui import VLCPasswordWindow
     from imports._ui import toggleGames, toggleMedia, toggleTime
     from imports._ui import initUI
-    from imports._ui import updateClientID, updateDefaultOptions, updateState, updateDetails, updateLargeText
+    from imports._ui import updateClientID, updateDefaultOptions, updateState, updateDetails, updateLargeText, updateTwitchReplacement
     from imports._ui import updateConfig, readConfig 
     from imports._ui import closeEvent, changeEvent, trayClicked, showLogFile, settings, exit
     from imports._shared_imports import getLogger, customExceptHook
@@ -33,6 +33,7 @@ class MainWindow(QMainWindow):
 
         if __name__ == "__main__":
             sys.excepthook = self.customExceptHook #Create own excepthook that replaces the existing one, but ONLY if running this code directly
+            self.log.info("Using custom except hook")
 
         if self.runRPC:
             self.checks() #Don't bother duplicate checking if RPC isn't running

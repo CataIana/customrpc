@@ -29,6 +29,7 @@ def initUI(self):
     self.detailsLayout = QHBoxLayout()
     self.defaultOptionsLayout = QHBoxLayout()
     self.largeTextLayout = QHBoxLayout()
+    self.twitchReplacementLayout = QHBoxLayout()
     self.optionsLayout = QHBoxLayout()
     self.options2Layout = QHBoxLayout()
     self.infoboxLayout = QHBoxLayout()
@@ -155,6 +156,25 @@ def initUI(self):
 
     #Add layout
     self.mainLayout.addLayout(self.largeTextLayout)
+
+    ##################################################################
+
+    #Objects
+    twitchReplacementLabel = QLabel("Twitch replace:")
+    self.twitchReplaceInput = QLineEdit(config["twitch_replacement"])
+    self.twitchReplaceButton = QPushButton(self.updateText)
+
+    #Add widgets
+    self.twitchReplacementLayout.addWidget(twitchReplacementLabel)
+    self.twitchReplacementLayout.addWidget(self.twitchReplaceInput)
+    self.twitchReplacementLayout.addWidget(self.twitchReplaceButton)
+
+    #Set extra data
+    self.twitchReplaceInput.returnPressed.connect(self.twitchReplaceButton.click) #Make enter button trigger the update button
+    self.twitchReplaceButton.clicked.connect(self.updateTwitchReplacement)
+
+    #Add layout
+    self.mainLayout.addLayout(self.twitchReplacementLayout)
 
     ##################################################################
     
