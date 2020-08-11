@@ -107,6 +107,7 @@ class MainWindow(QMainWindow):
                 if a not in exclusions:
                     programlist.append(a)
         programlist = list(dict.fromkeys(programlist))
+        self.programList.clear()
         self.programList.addItems(sorted(programlist, key=str.casefold))
 
     def checkExists(self, index):
