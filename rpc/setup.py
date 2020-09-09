@@ -7,7 +7,7 @@ from time import sleep
 from sys import platform
 
 exe_name = "rpc"
-py_file = "ui.py"
+py_file = "ui.pyw"
 donotremove = [
     py_file,
     "imports",
