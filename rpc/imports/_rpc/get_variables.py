@@ -70,7 +70,6 @@ def getVariables(self):
                         proc = Popen(["powershell", f"New-TimeSpan -Start (get-process -id {programlist[exe]}).StartTime"], shell=True, stdout=PIPE) #If found, find how long that process has been running for
                         for line in proc.stdout:
                             timeactive.append(line.decode().rstrip().replace(" ", ""))
-                    self.log.debug(timeactive)
                     timeactive_listed = list(filter(None, timeactive)) #Forget what this does, looks important
                     if timeactive_listed[0] != "Days:0": #Some programs do not record how long they have been running for. Catch this and just say the game name
                         self.details = f"Playing {realname}"
