@@ -13,3 +13,4 @@ data/*
 */*/*.log
 */*.log
 rpc icons
+rpc/debug_test2.py

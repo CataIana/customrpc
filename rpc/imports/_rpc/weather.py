@@ -9,7 +9,9 @@ def getWeather(self, request):
 
     try:
         if request == "temp":
-            return round(self.weather_json['current']['temp'], 1)
+            return round(self.weather_json["current"]["temp"], 1)
+        elif request == "description":
+            return self.weather_json["current"]["weather"][0]["description"].title()
         else:
             return None
     except KeyError:

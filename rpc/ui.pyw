@@ -94,7 +94,7 @@ class MainWindow(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv) #Create application
-    runRPC = False
+    runRPC = True
     if sys.argv.__len__() > 1:
         options = {"False": False, "True": True}
         if sys.argv[1].capitalize() in ["False", "True"]:

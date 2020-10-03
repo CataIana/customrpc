@@ -13,6 +13,7 @@ from subprocess import Popen, PIPE
 def getVariables(self):
     config = self.readConfig()
     if config["enable_media"] == True:
+        self.log.debug("Fetching music status")
         try:
             with open(self.music_file) as f:
                 music_read = f.read().splitlines() #Read music file
@@ -33,6 +34,7 @@ def getVariables(self):
                         position += int(position_read[i])*(60**i)
                     if self.state == "Twitch - Twitch":
                         self.state = config["twitch_replacement"]
+                    self.state = self.state.replace("Twitch - Twitch", "Twitch")
                     #Calculate the difference between the 2 times and set time left to how long that is plus the current time
                     if config["use_time_left"] == True:
                         self.time_left = time() + (duration - position)
@@ -48,6 +50,7 @@ def getVariables(self):
         self.time_left = None #When setting state, always set time_left
 
     if config["enable_games"] == True:
+        self.log.debug("Fetching game status")
         self.details = self.getDefaults("details") #Below code doesn't change anything if no process in gamelist is running. Wasn't an issue when not using OOP. Simplest fix, rather than making a boolean or similar
         self.small_image = None
         self.small_text = None
@@ -120,6 +123,7 @@ def getVariables(self):
         self.small_text = None
 
     if config["enable_media"] == True and config["vlc_pwd"] != "":
+        self.log.debug("Fetching VLC status (if applicable)")
         programlist = fetchProgramList(self.exclusions)
         if "vlc.exe" in programlist.keys(): #Check if vlc is running
             self.rSession.auth = ("", config["vlc_pwd"]) #Login to vlc client. See https://www.howtogeek.com/117261/how-to-activate-vlcs-web-interface-control-vlc-from-a-browser-use-any-smartphone-as-a-remote/
@@ -167,6 +171,7 @@ def getVariables(self):
     self.details = self.details[:128] #Make sure both variables aren't more than 128 characters long.
     self.state = self.state[:128] #Discord limits to 128 characters. Not my choice
     self.large_text = config["large_text"] #and set the large_text, the only one that is static
+    self.log.debug("Returning")
 
 def fetchProgramList(exclusions):
     programlist = {} #Program list is required for vlc detection, and it also required for game detection
@@ -199,7 +204,7 @@ def getDefaults(self, type_, config_override=None):
             if config["default_option"] == "Time":
                 return f"{datetime.now():%Y-%m-%d %I:%M %p}"
             if config["default_option"] == "Weather":
-                return f"Currently {self.getWeather('temp')}°C degrees"
+                return f"{self.getWeather('temp')}°C {self.getWeather('description')}"
             if config["default_option"] == "Use Text":
                 return config["default_state"]
             if config["default_option"] == "Rotating":

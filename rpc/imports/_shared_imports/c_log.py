@@ -14,7 +14,7 @@ def getLogger(self, level):
     log.addHandler(ch)
 
     fh = logging.FileHandler(f"{self.root}\\log.log", "a+", "utf-8")
-    fh.setLevel(level)
+    fh.setLevel("INFO")
 
     fh.setFormatter(formatter)
     log.addHandler(fh)
