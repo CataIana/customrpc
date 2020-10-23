@@ -6,7 +6,7 @@ def variables(self):
     self.toaster = ToastNotifier()
     self.exclusions = ["svchost.exe"] #Clean up program list. Kinda uncessary but probably saves ram.
     self.image_list = [
-        "kitty", "chicken", "chickies", "chub", "kitty2", "kitty3",
+        "kitty", "chicken", "chickies", "kitty2", "kitty3",
         "kitty4", "sleepy", "kitty5", "kitty6", "kitty7", "kitty8",
         "kitty9"] #The images available to the script
     self.game_icons = {

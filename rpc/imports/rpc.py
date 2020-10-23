@@ -18,11 +18,16 @@ class CustomRPC(Presence):
             self.root = path.dirname(path.realpath(__file__))
         except NameError:
             self.root = path.dirname(sys.argv[0]) 
-        if "logger" in kwargs:
+        if "logger" in kwargs.keys():
             self.log = kwargs["logger"]
             kwargs.pop("logger")
         else:
             self.log = self.getLogger("DEBUG")
+        if "fallback" in kwargs.keys():
+            self.fallback = kwargs["fallback"]
+            kwargs.pop("fallback")
+        else:
+            self.fallback = False
 
         super(CustomRPC, self).__init__(client_id)
         self.supported_platforms = ["win32"] #It's for personal use, I don't use linux anymore or macos
@@ -36,29 +41,29 @@ class CustomRPC(Presence):
         self.variables()
         self.reconnect() #Initalize connection. Own function created to avoid errors if discord isn't open
         try:
-            self.updateRPC(False)
+            self.updateRPC(self.fallback, False)
         except ServerError:
             self.log.critical("Client ID is invalid!")
             raise TypeError(f"Client ID {self.client_id} is invalid")
         except InvalidID:
-            self.updateRPC(False)
+            self.updateRPC(self.fallback, False)
 
     def mainLoop(self):
         while self.isRunning:
             if self.isConnected:
                 prev_state, prev_details, prev_large_text, prev_time_left = self.state, self.details, self.large_text, self.time_left #Store previous state/details
-                self.getVariables()
+                self.getVariables(self.fallback)
                 f = True
                 while self.state == prev_state and self.details == prev_details and self.large_text == prev_large_text and self.compareTimes(self.time_left, prev_time_left): #If variables haven't changed don't bother sending requests to discord.
                     if f:
                         self.log.info("Waiting for update")
                         f = False
-                    self.getVariables() #Check if variables have changed
+                    self.getVariables(self.fallback) #Check if variables have changed
                     loop = QEventLoop()
                     QTimer.singleShot(2000, loop.quit)
                     loop.exec_() #Avoid wasting cpu time and wait 2 seconds before trying again
                 try:
-                    self.updateRPC()
+                    self.updateRPC(self.fallback)
                 except InvalidID:  #If connection lost to Discord, attempt reconnection
                     self.log.info("Reconnecting...")
                     self.isConnected = False

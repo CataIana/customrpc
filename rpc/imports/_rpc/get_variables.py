@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 
 from subprocess import Popen, PIPE
 
-def getVariables(self):
+def getVariables(self, fallback):
     config = self.readConfig()
     if config["enable_media"] == True:
         self.log.debug("Fetching music status")
@@ -28,18 +28,23 @@ def getVariables(self):
                     position_read = music_read[2].split(":")[::-1]
                     duration = 0
                     position = 0
-                    for i in range(len(duration_read)-1, -1, -1): #Smart loop to convert times from hour/minutes to seconds. Fully expandable, so works with any lengths
-                        duration += int(duration_read[i])*(60**i)
-                    for i in range(len(position_read)-1, -1, -1):
-                        position += int(position_read[i])*(60**i)
-                    if self.state == "Twitch - Twitch":
-                        self.state = config["twitch_replacement"]
-                    self.state = self.state.replace("Twitch - Twitch", "Twitch")
-                    #Calculate the difference between the 2 times and set time left to how long that is plus the current time
-                    if config["use_time_left"] == True:
-                        self.time_left = time() + (duration - position)
+                    try:
+                        for i in range(len(duration_read)-1, -1, -1): #Smart loop to convert times from hour/minutes to seconds. Fully expandable, so works with any lengths
+                            duration += int(duration_read[i])*(60**i)
+                        for i in range(len(position_read)-1, -1, -1):
+                            position += int(position_read[i])*(60**i)
+                    except ValueError:
+                        pass
                     else:
-                        self.time_left = int(time() - position)
+                        #Calculate the difference between the 2 times and set time left to how long that is plus the current time
+                        if config["use_time_left"] == True:
+                            self.time_left = time() + (duration - position)
+                        else:
+                            self.time_left = int(time() - position)
+                    if self.state == "Twitch - Twitch" or self.state == "Twitch":
+                        self.state = config["twitch_replacement"]
+                    else:
+                        self.state = self.state.replace("Twitch - Twitch", "Twitch")
                 else:
                     self.state = self.getDefaults("state") #If music is not playing let details be the default setting
                     self.time_left = None
@@ -99,7 +104,10 @@ def getVariables(self):
                                 self.small_text = realname
                                 break
                             else: #Show just the minutes
-                                self.details = f"Playing {realname} for {d['Minutes']}m"
+                                if fallback:
+                                    self.details = f"Playing {realname} for {d['Minutes']}m"
+                                else:
+                                    self.details = f"for {d['Minutes']}m"
                                 try:
                                     self.small_image = self.game_icons[realname]
                                 except KeyError:
@@ -107,7 +115,10 @@ def getVariables(self):
                                 self.small_text = realname
                                 break
                         else: #Otherwise display hours and minutes
-                            self.details = f"Playing {realname} for {d['Hours']}h:{d['Minutes']}m"
+                            if fallback:
+                                self.details = f"Playing {realname} for {d['Hours']}h:{d['Minutes']}m"
+                            else:
+                                self.details = f"for {d['Hours']}h:{d['Minutes']}m"
                             try:
                                 self.small_image = self.game_icons[realname]
                             except KeyError:
@@ -173,7 +184,7 @@ def getVariables(self):
     self.large_text = config["large_text"] #and set the large_text, the only one that is static
     self.log.debug("Returning")
 
-def fetchProgramList(exclusions):
+def fetchProgramList(exclusions=[]):
     programlist = {} #Program list is required for vlc detection, and it also required for game detection
     proc = Popen(["WMIC", "PROCESS", "get", "Caption", ",", "ProcessID"], shell=True, stdout=PIPE) #Get running processes and process ids associated with them
     for line in proc.stdout:

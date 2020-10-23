@@ -22,8 +22,8 @@ def reconnect(self):
         QTimer.singleShot(5000, loop.quit)
         loop.exec_()
 
-def updateRPC(self, wait=True): #Not sure why this didn't happen sooner, but set the details straight away, rather than waiting for a change.
-    self.getVariables()
+def updateRPC(self, fallback, wait=True): #Not sure why this didn't happen sooner, but set the details straight away, rather than waiting for a change.
+    self.getVariables(fallback)
     config = self.readConfig()
     if (self.lastUpdateTime + 14) > time() and self.lastUpdateTime != 0: #This is a workaround for at the start of the code execution. Because the __init__ of this needs to finish,
         initSleep = (self.lastUpdateTime + 14) - time() #before the UI part will start working we must skip the sleep, otherwise the program will not progress until that sleep completes. This is the use of the wait variable at the bottom of this function

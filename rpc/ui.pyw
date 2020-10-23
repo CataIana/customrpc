@@ -9,7 +9,7 @@ from subprocess import Popen, PIPE  #Terminal commands and stuff
 import sys
 
 class MainWindow(QMainWindow):
-    from imports.rpc import CustomRPC
+    from imports import RPCController
     from imports._ui import VLCPasswordWindow
     from imports._ui import toggleGames, toggleMedia, toggleTime
     from imports._ui import initUI
@@ -47,7 +47,7 @@ class MainWindow(QMainWindow):
             self.initRPC()
         self.log.debug("Finished init")
         if self.runRPC:
-            self.rpc.mainLoop() #Run the mainloop.
+            self.rpc.controller() #Run the mainloop.
 
     def variables(self):
         self.windowTitle = "RPC Settings"
@@ -82,15 +82,14 @@ class MainWindow(QMainWindow):
     def restartRPC(self): #Trigger the rpc function to stop and reinitialize it
         if self.runRPC:
             self.log.info("Restarting RPC")
-            self.rpc.stop()
+            self.rpc.isRunning = False
             self.initRPC()
         else:
             self.log.info("RPC is not enabled! Cannot restart.")
             self.info.setText("RPC is not enabled! Cannot restart.")
 
     def initRPC(self):
-        config = self.readConfig()
-        self.rpc = self.CustomRPC(config["client_id"], logger=self.log) #Initialize rpc script
+        self.rpc = self.RPCController(logger=self.log) #Initialize rpc script
 
 if __name__ == "__main__":
     app = QApplication(sys.argv) #Create application
