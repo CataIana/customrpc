@@ -6,12 +6,13 @@ def updateConfig(self, config):
     with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json", "w") as f:
         f.write(j_print(config, indent=4)) #Overwrite config file with config passed
 
-def readConfig(self):
+def readConfig(self=None):
     try:
         with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f: #Read  config and return in json format
             return j_load(f)
     except FileNotFoundError:
-        self.log.error("Config not found! Generating...") #Generate config with default options if not found
+        if self != None:
+            self.log.error("Config not found! Generating...") #Generate config with default options if not found
         data = {
             "client_id": "",
             "default_state": "  ",
@@ -28,6 +29,7 @@ def readConfig(self):
             mkdir(f"{environ['LOCALAPPDATA']}\\customrpc") #Create customrpc folder if it doesn't exist
         with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json", "w") as f:
             f.write(j_print(data, indent=4)) #Write new config file
-        self.log.info("Sucessfully created config file.")
+        if self != None:
+            self.log.info("Sucessfully created config file.")
         with open(f"{environ['LOCALAPPDATA']}\\customrpc\\config.json") as f:
             return j_load(f) #And return it as normal

@@ -13,3 +13,10 @@ data/*
 */*/*.log
 */*.log
 rpc icons
+config.json
+*/config.json
+*/.cache*
+.cache*
+*/testing*
+.vscode
+*/.vscode

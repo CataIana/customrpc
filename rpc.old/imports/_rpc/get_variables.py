@@ -2,6 +2,7 @@ import sys
 from time import time
 from datetime import datetime
 from os import environ, path, mkdir
+import psutil
 
 from json import load as j_load
 
@@ -119,6 +120,11 @@ def getVariables(self):
         self.small_image = None
         self.small_text = None
 
+
+    for proc in psutil.process_iter():
+        if(proc.name() == "LogonUI.exe"):
+            self.details = "PC Locked"
+
     if config["enable_media"] == True and config["vlc_pwd"] != "":
         programlist = fetchProgramList(self.exclusions)
         if "vlc.exe" in programlist.keys(): #Check if vlc is running
@@ -178,33 +184,30 @@ def fetchProgramList(exclusions):
                 programlist[program[0]] = program[1] #Add process and process id to dictionary
     return programlist
 
-def getDefaults(self, type_, config_override=None):
-        if config_override == None:
-            config = self.readConfig()
-        else:
-            config = config_override
-        if type_ == "details":
-            if config["default_option"] == "Time":
-                return "Sydney, Australia 🇦🇺"
-            if config["default_option"] == "Weather":
-                return "Sydney, Australia 🇦🇺"
-            if config["default_option"] == "Use Text":
-                return config["default_details"]
-            if config["default_option"] == "Rotating":
-                if self.rollingIndexDetails > self.rollingOptions.__len__()-1:
-                    self.rollingIndexDetails = 0
-                config["default_option"] = self.rollingOptions[self.rollingIndexDetails]
-                return self.getDefaults(type_, config)
-        if type_ == "state":
-            if config["default_option"] == "Time":
-                return f"{datetime.now():%Y-%m-%d %I:%M %p}"
-            if config["default_option"] == "Weather":
-                return f"Currently {self.getWeather('temp')}°C degrees"
-            if config["default_option"] == "Use Text":
-                return config["default_state"]
-            if config["default_option"] == "Rotating":
-                if self.rollingIndexState > self.rollingOptions.__len__()-1:
-                    self.rollingIndexState = 0
-                config["default_option"] = self.rollingOptions[self.rollingIndexState]
-                return self.getDefaults(type_, config)
-        return "None"
+def getDefaults(self, type_, config=None):
+    config = config or self.readConfig()
+    if type_ == "details":
+        if config["default_option"] == "Time":
+            return "Sydney, Australia 🇦🇺"
+        if config["default_option"] == "Weather":
+            return "Sydney, Australia 🇦🇺"
+        if config["default_option"] == "Use Text":
+            return config["default_details"]
+        if config["default_option"] == "Rotating":
+            if self.rollingIndexDetails > self.rollingOptions.__len__()-1:
+                self.rollingIndexDetails = 0
+            config["default_option"] = self.rollingOptions[self.rollingIndexDetails]
+            return self.getDefaults(type_, config)
+    if type_ == "state":
+        if config["default_option"] == "Time":
+            return f"{datetime.now():%Y-%m-%d %I:%M %p}"
+        if config["default_option"] == "Weather":
+            return f"{self.getWeather('temp')}°C {self.getWeather('description')}"
+        if config["default_option"] == "Use Text":
+            return config["default_state"]
+        if config["default_option"] == "Rotating":
+            if self.rollingIndexState > self.rollingOptions.__len__()-1:
+                self.rollingIndexState = 0
+            config["default_option"] = self.rollingOptions[self.rollingIndexState]
+            return self.getDefaults(type_, config)
+    return "None"
