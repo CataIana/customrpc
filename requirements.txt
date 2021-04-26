@@ -1,8 +1,6 @@
 pypresence
-requests
-bs4
-lxml
-win10toast
+psutil
+spotipy
 
 openpyxl
 

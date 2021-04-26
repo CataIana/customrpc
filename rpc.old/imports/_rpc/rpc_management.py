@@ -1,6 +1,5 @@
-from pypresence.exceptions import InvalidPipe, InvalidID, ServerError
-from PyQt5.QtCore import QTimer, QEventLoop
-from time import time
+from pypresence.exceptions import InvalidPipe, InvalidID
+from time import time, sleep
 from random import choice
 
 def reconnect(self):
@@ -18,9 +17,7 @@ def reconnect(self):
         else:
             self.log.info("Connected.")
             self.isConnected = True
-        loop = QEventLoop()
-        QTimer.singleShot(5000, loop.quit)
-        loop.exec_()
+        sleep(5)
 
 def updateRPC(self, fallback, wait=True): #Not sure why this didn't happen sooner, but set the details straight away, rather than waiting for a change.
     self.getVariables(fallback)
@@ -28,9 +25,7 @@ def updateRPC(self, fallback, wait=True): #Not sure why this didn't happen soone
     if (self.lastUpdateTime + 14) > time() and self.lastUpdateTime != 0: #This is a workaround for at the start of the code execution. Because the __init__ of this needs to finish,
         initSleep = (self.lastUpdateTime + 14) - time() #before the UI part will start working we must skip the sleep, otherwise the program will not progress until that sleep completes. This is the use of the wait variable at the bottom of this function
         self.log.debug(f"Init sleeping for {initSleep}") #This loop is then put into action immediately after without waiting, which is an issue, as the RPC is set after about 2 seconds, which discord will accept, but it should only be set every 15 seconds
-        loop = QEventLoop()
-        QTimer.singleShot(initSleep*1000, loop.quit)
-        loop.exec_() #This prevents that and should only run at the very start, or somehow the sleep(15) at the bottom of this function gets cut short. It will be logged for now to ensure this is the case
+        sleep(initSleep) #This prevents that and should only run at the very start, or somehow the sleep(15) at the bottom of this function gets cut short. It will be logged for now to ensure this is the case
         self.getVariables() #Since it generally sleeps for about 14 seconds, get the variables again, just to be sure
 
     if config["use_time_left"]:
@@ -57,10 +52,11 @@ def updateRPC(self, fallback, wait=True): #Not sure why this didn't happen soone
     self.rollingIndexDetails += 1
     self.rollingIndexState += 1
     timestamps = ""
-    for x, y in output["data"]["timestamps"].items():
-        timestamps += f"{x}: {y}, ".strip(", ")
+    try:
+        for x, y in output["data"]["timestamps"].items():
+            timestamps += f"{x}: {y}, ".strip(", ")
+    except KeyError:
+        pass
     self.log.info(f"{output['cmd']} State: {output['data']['state']} Details: {output['data']['details']}  Timestamps: {timestamps}")
     if wait == True:
-        loop = QEventLoop()
-        QTimer.singleShot(15000, loop.quit)
-        loop.exec_()
+        sleep(15)

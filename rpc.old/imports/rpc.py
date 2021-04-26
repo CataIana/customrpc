@@ -1,10 +1,10 @@
 from pypresence import Presence
 from pypresence.exceptions import InvalidID, ServerError
-from PyQt5.QtCore import QTimer, QEventLoop
 
 import sys
 from os import environ, path
 from json import load as j_load
+from time import sleep
 
 
 class CustomRPC(Presence):
@@ -58,10 +58,15 @@ class CustomRPC(Presence):
                     if f:
                         self.log.info("Waiting for update")
                         f = False
+<<<<<<< HEAD:rpc/imports/rpc.py
                     self.getVariables(self.fallback) #Check if variables have changed
                     loop = QEventLoop()
                     QTimer.singleShot(2000, loop.quit)
                     loop.exec_() #Avoid wasting cpu time and wait 2 seconds before trying again
+=======
+                    self.getVariables() #Check if variables have changed
+                    sleep(2) #Avoid wasting cpu time and wait 2 seconds before trying again
+>>>>>>> tmp:rpc.old/imports/rpc.py
                 try:
                     self.updateRPC(self.fallback)
                 except InvalidID:  #If connection lost to Discord, attempt reconnection

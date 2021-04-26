@@ -6,9 +6,14 @@ def variables(self):
     self.toaster = ToastNotifier()
     self.exclusions = ["svchost.exe"] #Clean up program list. Kinda uncessary but probably saves ram.
     self.image_list = [
+<<<<<<< HEAD:rpc/imports/_rpc/var.py
         "kitty", "chicken", "chickies", "kitty2", "kitty3",
         "kitty4", "sleepy", "kitty5", "kitty6", "kitty7", "kitty8",
         "kitty9"] #The images available to the script
+=======
+        "kitty", "chicken", "chickies", "kitty2", 
+        "kitty3", "kitty4", "sleepy", "kitty5", "kitty6", "kitty7"] #The images available to the script
+>>>>>>> tmp:rpc.old/imports/_rpc/var.py
     self.game_icons = {
         "Battlefield 1": "bf1",
         "Call of Duty: Black Ops": "bo1",
