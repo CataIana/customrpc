@@ -133,11 +133,10 @@ class CustomRPC():
                     except KeyError:
                         pass
         if self.config["show_other_media"] or self.config["show_games"]:
-            processes = {p.name(): {"object": p, "info": self.config["games"][p.name().lower()]} for p in process_iter(['name', 'status']) if p.name().lower() in self.config["games"].keys()}
-        using_vlc = False
+            processes = {p.name(): {"object": p, "info": self.config["games"].get(p.name().lower(), None)} for p in process_iter(['name', 'status']) if p.name().lower() in (list(self.config["games"].keys())+["vlc.exe"])}
         if self.config["show_other_media"]:
-            if processes.get("vlc.exe", None) is not None:
-                process = processes.get("vlc.exe")
+            process = processes.get("vlc.exe", None)
+            if process is not None:
                 process_info = process["info"]
                 with process["object"].oneshot():
                     try:
@@ -160,18 +159,17 @@ class CustomRPC():
                                         vlcartist = x["#text"]
                                 if vlctitle is None:
                                     vlctitle = vlcfilename
-                                payload["state"] = vlctitle[:112]
-                                payload["details"] = vlcartist[:112]
+                                payload["state"] = f"{vlctitle} - {vlcartist}"[:112]
                                 if self.config["use_time_left_media"] == True:
                                     payload["end"] = int(time() + int(p["time"]))
                                 else:
                                     payload["start"] = int(time() - int(p["time"]))
-                                payload["small_image"] = process_info["icon"]
-                                client_id = process_info["client_id"]
-                                using_vlc = True
+                                payload["small_image"] = self.config["vlc_icon"]
+                                client_id = self.config["vlc_cid"]
                         except KeyError as e:
                             pass
                             self.log.debug(f"KeyError processing VLC dict: {e}")
+        processes.pop("vlc.exe", None)
         if self.config["show_games"]:
             if processes != {}:
                 process = list(processes.values())[0]
@@ -196,10 +194,7 @@ class CustomRPC():
                     time_info = f"for {conv['days'] if conv['days'] != '0' else ''}{'' if conv['days'] == '0' else 'd, '}{conv['hours'] if conv['hours'] != '0' else ''}{'' if conv['hours'] == '0' else 'h, '}{conv['minutes'] if conv['minutes'] != '0' else ''}{'' if conv['minutes'] == '0' else 'm'}"
 
                     client_id = process_info["client_id"]
-                    if using_vlc and process["object"].name() != "vlc.exe":
-                        payload["state"] += f" - {payload['details']}"
-                    if not process["object"].name() == "vlc.exe":
-                        payload["details"] = f"{time_info}"
+                    payload["details"] = f"{time_info}"
                     payload["small_image"] = process_info["icon"]
 
         return client_id, payload
