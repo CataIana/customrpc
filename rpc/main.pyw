@@ -7,41 +7,70 @@ from os import getcwd
 from psutil import process_iter, boot_time
 from spotipy import Spotify, SpotifyException
 from pypresence import Presence
+from pypresence.exceptions import InvalidID, InvalidPipe
 from time import localtime, strftime
+from requests import get
+from xml_to_dict import XMLtoDict
+import logging
+import sys
+import signal
 
 
 class CustomRPC():
     def __init__(self):
         with open(f"{getcwd()}/config.json") as f:
             self.config = j_load(f)
-        self.client_ids = {"default": 607432133061115928,
-                           "spotify": 835138322879479868}
-        self.games = self.config["games"]
+
+        signal.signal(signal.SIGINT, self.close)
+        self.format = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
+        self.log_level = logging.DEBUG
+        self.log = logging.getLogger("customrpc")
+        self.log.setLevel(self.log_level)
+
+        fhandler = logging.FileHandler(filename="rpc.log", encoding="utf-8", mode="a+")
+        fhandler.setLevel(logging.INFO)
+        fhandler.setFormatter(self.format)
+        self.log.addHandler(fhandler)
+
+        chandler = logging.StreamHandler(sys.stdout)                             
+        chandler.setLevel(self.log_level)
+        chandler.setFormatter(self.format)                                        
+        self.log.addHandler(chandler)
+
         self.prev_cid = None
         self.connected = False
         self.previous_payload = None
         self.force_update = True
         self.auth_spotify()
+        self.xml_parser = XMLtoDict()
 
     def auth_spotify(self):
-        print("Authorising Spotify")
+        self.log.debug("Authorising Spotify")
         token = util.prompt_for_user_token(
             scope="user-read-currently-playing user-read-playback-state", **self.config["spotify"])
         self.sp = Spotify(auth=token)
 
     def reconnect(self, client_id=None):
+        if client_id is None:
+            client_id = self.config["default_cid"]
         if self.connected:
             self.RPC.close()
             self.connected = False
-        if client_id is None:
-            print(f"Connecting with Client ID {self.client_ids['default']}")
-            self.RPC = Presence(client_id=self.client_ids["default"])
-        else:
-            print(f"Connecting with Client ID {client_id}")
-            self.RPC = Presence(client_id=client_id)
+        self.log.info(f"Connecting with Client ID {client_id}")
+        self.RPC = Presence(client_id=client_id)
+        while True:
+            try:
+                self.RPC.connect()
+            except InvalidID as e:
+                sleep(2)
+                self.log.debug(f"Retrying... ({e})")
+            except InvalidPipe as e:
+                sleep(2)
+                self.log.debug(f"Retrying... ({e})")
+            else:
+                break
+        self.log.info("Connected")
         self.force_update = True
-        self.RPC.connect()
-        print("Connected")
         self.connected = True
 
     def same_payload(self, payload):
@@ -72,10 +101,10 @@ class CustomRPC():
 
     def get_payload(self):
         payload = {
-            "details": "uwu hi",
-            "state": "mew :3",
-            "buttons": [{"label": "I'm testing stuff go away", "url": "https://www.google.com.au"}],
-            "large_image": choice(self.config["large_image_names"])
+            "details": self.config["fallback_details"],
+            "state": self.config["fallback_state"],
+            "large_image": choice(self.config["large_image_names"]),
+            "large_text": self.config["fallback_largetext"]
         }
         client_id = None
         if self.config["show_spotify"]:
@@ -94,7 +123,7 @@ class CustomRPC():
                         payload["state"] = f"{spotify['item']['name']} - {spotify['item']['artists'][0]['name']}"
                         payload["buttons"][0] = {
                             "label": "Play on Spotify", "url": spotify["item"]["external_urls"]["spotify"]}
-                        client_id = self.client_ids["spotify"]
+                        client_id = self.config["spotify_cid"]
                         if self.config["use_time_left_media"] == True:
                             payload["end"] = time(
                             ) + (int(spotify["item"]["duration_ms"]/1000) - int(spotify["progress_ms"]/1000))
@@ -103,58 +132,123 @@ class CustomRPC():
                                 time() - int(spotify["progress_ms"]/1000))
                     except KeyError:
                         pass
+        if self.config["show_other_media"] or self.config["show_games"]:
+            processes = {p.name(): {"object": p, "info": self.config["games"][p.name().lower()]} for p in process_iter(['name', 'status']) if p.name().lower() in self.config["games"].keys()}
+        using_vlc = False
+        if self.config["show_other_media"]:
+            if processes.get("vlc.exe", None) is not None:
+                process = processes.get("vlc.exe")
+                process_info = process["info"]
+                with process["object"].oneshot():
+                    try:
+                        r = get("http://localhost:8080/requests/status.xml", verify=False, auth=("", self.config["vlc_http_password"]), timeout=2)
+                    except ConnectionError as e:
+                        pass
+                        self.log.debug(f"Connection error processing VLC dict: {e}")
+                    else:
+                        try:
+                            p = self.xml_parser.parse(r.text)["root"]
+                            if p["state"] == "playing":
+                                vlctitle = None
+                                vlcartist = None
+                                for x in p["information"]["category"][0]["info"]:
+                                    if x["@name"] == "title":
+                                        vlctitle = x["#text"]
+                                    if x["@name"] == "filename":
+                                        vlcfilename = x["#text"]
+                                    if x["@name"] == "artist":
+                                        vlcartist = x["#text"]
+                                if vlctitle is None:
+                                    vlctitle = vlcfilename
+                                payload["state"] = vlctitle[:112]
+                                payload["details"] = vlcartist[:112]
+                                if self.config["use_time_left_media"] == True:
+                                    payload["end"] = int(time() + int(p["time"]))
+                                else:
+                                    payload["start"] = int(time() - int(p["time"]))
+                                payload["small_image"] = process_info["icon"]
+                                client_id = process_info["client_id"]
+                                using_vlc = True
+                        except KeyError as e:
+                            pass
+                            self.log.debug(f"KeyError processing VLC dict: {e}")
         if self.config["show_games"]:
-            processes = [p for p in process_iter(
-                ['name', 'status']) if p.name().lower() in self.games.keys()]
-            process = processes[0]
-            with process.oneshot():
-                process_info = self.games[process.name().lower()]
-                if self.prev_cid != process_info["client_id"]:
-                    print(
-                        f"Matched process {process.name()} to client ID {process_info['client_id']} with name {process_info['name']}")
-                client_id = process_info["client_id"]
-                try:
-                    create_time = process.create_time()
-                except OSError:
-                    # system processes, using boot time instead
-                    create_time = boot_time()
-                epoch = time() - create_time
-                conv = {
-                    "days": str(epoch // 86400).split('.')[0],
-                    "hours": str(epoch // 3600 % 24).split('.')[0],
-                    "minutes": str(epoch // 60 % 60).split('.')[0],
-                    "seconds": str(epoch % 60).split('.')[0],
-                    "full": strftime('%Y-%m-%d %I:%M:%S %p %Z', localtime(create_time))
-                }
-                time_info = f"for {conv['days'] if conv['days'] != '0' else ''}{'' if conv['days'] == '0' else 'd, '}{conv['hours'] if conv['hours'] != '0' else ''}{'' if conv['hours'] == '0' else 'h, '}{conv['minutes'] if conv['minutes'] != '0' else ''}{'' if conv['minutes'] == '0' else 'm'}"
-                payload["details"] = f"{time_info}"
-                payload["small_image"] = process_info["icon"]
+            if processes != {}:
+                process = list(processes.values())[0]
+                with process["object"].oneshot():
+                    process_info = process["info"]
+                    if self.prev_cid != process_info["client_id"]:
+                        self.log.debug(
+                            f"Matched process {process['object'].name()} to client ID {process_info['client_id']} with name {process_info['name']}")
+                    try:
+                        create_time = process["object"].create_time()
+                    except OSError:
+                        # system processes, using boot time instead
+                        create_time = boot_time()
+                    epoch = time() - create_time
+                    conv = {
+                        "days": str(epoch // 86400).split('.')[0],
+                        "hours": str(epoch // 3600 % 24).split('.')[0],
+                        "minutes": str(epoch // 60 % 60).split('.')[0],
+                        "seconds": str(epoch % 60).split('.')[0],
+                        "full": strftime('%Y-%m-%d %I:%M:%S %p %Z', localtime(create_time))
+                    }
+                    time_info = f"for {conv['days'] if conv['days'] != '0' else ''}{'' if conv['days'] == '0' else 'd, '}{conv['hours'] if conv['hours'] != '0' else ''}{'' if conv['hours'] == '0' else 'h, '}{conv['minutes'] if conv['minutes'] != '0' else ''}{'' if conv['minutes'] == '0' else 'm'}"
+
+                    client_id = process_info["client_id"]
+                    if using_vlc and process["object"].name() != "vlc.exe":
+                        payload["state"] += f" - {payload['details']}"
+                    if not process["object"].name() == "vlc.exe":
+                        payload["details"] = f"{time_info}"
+                    payload["small_image"] = process_info["icon"]
 
         return client_id, payload
 
     def main(self):
         client_id, payload = self.get_payload()
         if self.prev_cid != client_id:
-            print(f"Switching from {self.prev_cid} to {client_id}")
+            self.log.info(f"Switching from {self.prev_cid} to {client_id}")
             self.prev_cid = client_id
             self.reconnect(client_id=client_id)
         if not self.connected:
             self.reconnect(client_id=client_id)
         if not self.same_payload(payload):
-            print(f"Setting presence with payload {payload}")
-            self.RPC.update(**payload)  # Can specify up to 2 buttons
+            self.log.debug(f"Setting presence with payload {payload}")
+            while True:
+                try:
+                    self.RPC.update(**payload)  # Can specify up to 2 buttons
+                except InvalidID:
+                    self.log.warning("Invalid ID, restarting...")
+                    self.reconnect(client_id=client_id)
+                except InvalidPipe:
+                    self.log.warning("InvalidPipe, is discord running? Reconnecting...")
+                    self.reconnect(client_id=client_id)
+                else:
+                    break
             sleep(15)
         else:
-            print("Ignoring same payload")
+            self.log.debug("Ignoring same payload")
             sleep(5)
         try:
             with open(f"{getcwd()}/config.json") as f:
                 self.config = j_load(f)
         except JSONDecodeError:
-            print("Error reading config file")
+            self.log.warning("Error reading config file")
+        except FileNotFoundError:
+            self.log.warning("Error reading config file")
+
+    def close(self, signal, frame):
+        self.log.info("Stopping...")
+        try:
+            self.RPC.close()
+        except AttributeError:
             pass
+        sys.exit()
 
 
 rpc = CustomRPC()
 while True:
-    rpc.main()
+    try:
+        rpc.main()
+    except Exception as e:
+        rpc.log.error(f"Exception: {e}")
