@@ -13,10 +13,6 @@ data/*
 */*/*.log
 */*.log
 rpc icons
-<<<<<<< HEAD
-rpc/debug_test2.py
-rpc/.vscode/settings.json
-=======
 config.json
 */config.json
 */.cache*
@@ -24,4 +20,4 @@ config.json
 */testing*
 .vscode
 */.vscode
->>>>>>> tmp
+info.json

@@ -14,6 +14,7 @@ from xml_to_dict import XMLtoDict
 import logging
 import sys
 import signal
+from traceback import format_tb
 
 
 class CustomRPC():
@@ -99,6 +100,16 @@ class CustomRPC():
         except TypeError:
             return True
 
+    def add_button(self, payload, new_button):
+        #self.log.debug(f"{payload.get('buttons', [])}, {new_button}")
+        buttons = payload.get("buttons", [])
+        if buttons != []:
+            buttons = [new_button] + [buttons[0]]
+        else:
+            buttons = [new_button]
+        payload["buttons"] = buttons
+        return payload
+
     def get_payload(self):
         payload = {
             "details": self.config["fallback_details"],
@@ -106,6 +117,8 @@ class CustomRPC():
             "large_image": choice(self.config["large_image_names"]),
             "large_text": self.config["fallback_largetext"]
         }
+        if self.config["use_extra_button"]:
+            self.add_button(payload, self.config["extra_button"])
         client_id = None
         if self.config["show_spotify"]:
             try:
@@ -121,8 +134,7 @@ class CustomRPC():
                 else:
                     try:
                         payload["state"] = f"{spotify['item']['name']} - {spotify['item']['artists'][0]['name']}"
-                        payload["buttons"][0] = {
-                            "label": "Play on Spotify", "url": spotify["item"]["external_urls"]["spotify"]}
+                        payload = self.add_button(payload, {"label": "Play on Spotify", "url": spotify["item"]["external_urls"]["spotify"]})
                         client_id = self.config["spotify_cid"]
                         if self.config["use_time_left_media"] == True:
                             payload["end"] = time(
@@ -130,8 +142,9 @@ class CustomRPC():
                         else:
                             payload["start"] = int(
                                 time() - int(spotify["progress_ms"]/1000))
-                    except KeyError:
-                        pass
+                    except KeyError as e:
+                        formatted_exception = "Traceback (most recent call last):\n" + ''.join(format_tb(e.__traceback__)) + f"{type(e).__name__}: {e}"
+                        self.log.error(formatted_exception)
         if self.config["show_other_media"] or self.config["show_games"]:
             processes = {p.name(): {"object": p, "info": self.config["games"].get(p.name().lower(), None)} for p in process_iter(['name', 'status']) if p.name().lower() in (list(self.config["games"].keys())+["vlc.exe"])}
         if self.config["show_other_media"]:
@@ -167,8 +180,42 @@ class CustomRPC():
                                 payload["small_image"] = self.config["vlc_icon"]
                                 client_id = self.config["vlc_cid"]
                         except KeyError as e:
-                            pass
                             self.log.debug(f"KeyError processing VLC dict: {e}")
+
+            webnp = ""
+            while webnp == "":
+                try:
+                    with open("info.json") as f:
+                        webnp = j_load(f)
+                except JSONDecodeError:
+                    pass
+            if time() - webnp.get("last_update", 0) < 10:
+                if webnp.get("state", None) == "1":
+                    if webnp["player"] in self.config["other_media"].keys():
+                        client_id = self.config["other_media"][webnp["player"]]["client_id"]
+                        if len(f"{webnp['title']} - {webnp['artist']}") > 128:
+                            payload["state"] = f"{webnp['title'][:-(len(webnp['artist'])-(128-len(webnp['artist'])-3))]}... - {webnp['artist']}"
+                        else:
+                            payload["state"] = f"{webnp['title']} - {webnp['artist']}"
+                        payload["small_image"] = self.config["other_media"][webnp["player"]]["icon"]
+                        if webnp["player"] == "Twitch":
+                            payload = self.add_button(payload, {"label": "Watch on Twitch", "url": f"https://twitch.tv/{webnp['artist'].lower()}"})
+                        duration_read = webnp["duration"].split(":")[::-1]
+                        position_read = webnp["position"].split(":")[::-1]
+                        duration = 0
+                        position = 0
+                        try:
+                            for i in range(len(duration_read)-1, -1, -1): #Smart loop to convert times from hour/minutes to seconds. Fully expandable, so works with any lengths
+                                duration += int(duration_read[i])*(60**i)
+                            for i in range(len(position_read)-1, -1, -1):
+                                position += int(position_read[i])*(60**i)
+                        except ValueError:
+                            formatted_exception = "Traceback (most recent call last):\n" + ''.join(format_tb(e.__traceback__)) + f"{type(e).__name__}: {e}"
+                            self.log.warning(formatted_exception)
+                        if self.config["use_time_left_media"] == True:
+                            payload["end"] = int(time() + (duration - position))
+                        else:
+                            payload["start"] = int(time() - position)
         processes.pop("vlc.exe", None)
         if self.config["show_games"]:
             if processes != {}:
@@ -211,7 +258,7 @@ class CustomRPC():
             self.log.debug(f"Setting presence with payload {payload}")
             while True:
                 try:
-                    self.RPC.update(**payload)  # Can specify up to 2 buttons
+                    self.RPC.update(**payload)
                 except InvalidID:
                     self.log.warning("Invalid ID, restarting...")
                     self.reconnect(client_id=client_id)
@@ -246,4 +293,4 @@ while True:
     try:
         rpc.main()
     except Exception as e:
-        rpc.log.error(f"Exception: {e}")
+        rpc.log.error("Traceback (most recent call last):\n" + ''.join(format_tb(e.__traceback__)) + f"{type(e).__name__}: {e}")
