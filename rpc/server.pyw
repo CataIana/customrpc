@@ -6,9 +6,9 @@ from json import dumps
 from time import time
 
 
-class WebNowPlaying:
-    def __init__(self, port, loop=None):
-        # Init variables
+class Client:
+    def __init__(self, id):
+        self.id = id
         self.player = None
         self.state = None
         self.title = None
@@ -23,6 +23,17 @@ class WebNowPlaying:
         self.cover = None
         self.last_update = time()
 
+    def get_dict(self):
+        return {"player": self.player, "state": self.state, "title": self.title, "artist": self.artist, "album": self.album, "duration": self.duration, "position": self.position,
+                "volume": self.volume, "rating": self.rating, "repeat": self.repeat, "shuffle": self.shuffle, "cover": self.cover, "last_update": self.last_update}
+
+
+class WebNowPlaying:
+    def __init__(self, port, loop=None):
+
+        self.clients = {}
+        self.playing_order = []
+
         start_server = websockets.serve(self.handler, "localhost", port)
         if loop is None:
             self.loop = asyncio.get_event_loop()
@@ -34,20 +45,69 @@ class WebNowPlaying:
         self.loop.run_forever()
 
     async def handler(self, websocket, path):
-        async for message in websocket:
-            print(message)
-            setattr(self, message.split(":", 1)[0].lower(), message.split(":", 1)[1])
-            self.last_update = time()
+        try:
+            async for message in websocket:
+                attribute = message.split(":", 1)[0].lower()
+                data = message.split(":", 1)[1]
+                id = websocket.request_headers["Sec-WebSocket-Key"]
 
-            dict = {"player": self.player, "state": self.state, "title": self.title, "artist": self.artist, "album": self.album, "duration": self.duration,
-                    "position": self.position, "volume": self.volume, "rating": self.rating, "repeat": self.repeat, "shuffle": self.shuffle, "cover": self.cover, "last_update": self.last_update}
+                force_update = False
+
+                if self.clients.get(id, None) is None:
+                    self.clients[id] = Client(id=id)
+                    print(f"Tab opened")
+
+                if attribute == "state":
+                    if data == "1" and self.clients[id].state in ["2", None]:
+                        print(f"Set playing for {self.clients[id].artist}")
+                        self.playing_order.append(id)
+
+                if attribute == "state":
+                    if data == "2" and self.clients[id].state == "1":
+                        print(f"Set paused for {self.clients[id].artist}")
+                        self.playing_order.remove(id)
+                        force_update = True
+
+                setattr(self.clients[id], attribute, data)
+                self.clients[id].last_update = time()
+
+                if force_update:
+                    await self.update(id=id)
+
+                await self.update()
+        except websockets.exceptions.ConnectionClosedError:
+            id = websocket.request_headers["Sec-WebSocket-Key"]
+            try:
+                self.playing_order.remove(id)
+            except ValueError:
+                pass
+            old_tab = self.clients[id].artist
+            del self.clients[id]
+            if len(self.clients.keys()) > 0:
+                recent = list(self.clients.keys())[-1]
+                print(f"Tab closed for {old_tab}, restoring to {self.clients[recent].artist}")
+                await self.update(id=recent)
+            else:
+                print(f"Tab closed for {old_tab}, nothing to restore to")
+                with open("info.json", "w") as f:
+                    f.write("")
+
+
+    async def update(self, id=None):
+        if self.playing_order != [] or id is not None:
+            if id is not None:
+                client = self.clients[id]
+                print(f"Force update for {client.artist}")
+            else:
+                client = self.clients[self.playing_order[-1]]
+
             with open("info.json", "w") as f:
-                f.write(dumps(dict, indent=4))
+                f.write(dumps(client.get_dict(), indent=4))
 
-
-w = WebNowPlaying(port=8975)
-try:
-    w.run()
-except KeyboardInterrupt:
-    with open("info.json", "w") as f:
-        f.write("")
+if __name__ == "__main__":
+    w = WebNowPlaying(port=8975)
+    try:
+        w.run()
+    except KeyboardInterrupt:
+        with open("info.json", "w") as f:
+            f.write("")

@@ -101,7 +101,6 @@ class CustomRPC():
             return True
 
     def add_button(self, payload, new_button):
-        #self.log.debug(f"{payload.get('buttons', [])}, {new_button}")
         buttons = payload.get("buttons", [])
         if buttons != []:
             buttons = [new_button] + [buttons[0]]
@@ -164,6 +163,8 @@ class CustomRPC():
                                 vlctitle = None
                                 vlcartist = None
                                 for x in p["information"]["category"][0]["info"]:
+                                    if type(p["information"]["category"][0]["info"]) is not list:
+                                        x = p["information"]["category"][0]["info"]
                                     if x["@name"] == "title":
                                         vlctitle = x["#text"]
                                     if x["@name"] == "filename":
@@ -182,13 +183,16 @@ class CustomRPC():
                         except KeyError as e:
                             self.log.debug(f"KeyError processing VLC dict: {e}")
 
-            webnp = ""
-            while webnp == "":
+            webnp = {}
+            failed = 0
+            while webnp == {}:
                 try:
                     with open("info.json") as f:
                         webnp = j_load(f)
                 except JSONDecodeError:
-                    pass
+                    failed += 1
+                    if failed > 9:
+                        break
             if time() - webnp.get("last_update", 0) < 10:
                 if webnp.get("state", None) == "1":
                     if webnp["player"] in self.config["other_media"].keys():
