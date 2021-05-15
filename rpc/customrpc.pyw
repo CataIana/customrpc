@@ -100,16 +100,9 @@ class CustomRPC():
         except TypeError:
             return True
 
-    def add_button(self, payload, new_button):
-        buttons = payload.get("buttons", [])
-        if buttons != []:
-            buttons = [new_button] + [buttons[0]]
-        else:
-            buttons = [new_button]
-        payload["buttons"] = buttons
-        return payload
-
     def get_payload(self):
+        extra_button = None
+        media_button = None
         payload = {
             "details": self.config["fallback_details"],
             "state": self.config["fallback_state"],
@@ -117,7 +110,7 @@ class CustomRPC():
             "large_text": self.config["fallback_largetext"]
         }
         if self.config["use_extra_button"]:
-            self.add_button(payload, self.config["extra_button"])
+            extra_button = self.config["extra_button"]
         client_id = None
         if self.config["show_spotify"]:
             try:
@@ -133,7 +126,7 @@ class CustomRPC():
                 else:
                     try:
                         payload["state"] = f"{spotify['item']['name']} - {spotify['item']['artists'][0]['name']}"
-                        payload = self.add_button(payload, {"label": "Play on Spotify", "url": spotify["item"]["external_urls"]["spotify"]})
+                        media_button = {"label": "Play on Spotify", "url": spotify["item"]["external_urls"]["spotify"]}
                         client_id = self.config["spotify_cid"]
                         if self.config["use_time_left_media"] == True:
                             payload["end"] = time(
@@ -193,6 +186,8 @@ class CustomRPC():
                     failed += 1
                     if failed > 9:
                         break
+                except FileNotFoundError:
+                    break
             if time() - webnp.get("last_update", 0) < 10:
                 if webnp.get("state", None) == "1":
                     if webnp["player"] in self.config["other_media"].keys():
@@ -203,7 +198,7 @@ class CustomRPC():
                             payload["state"] = f"{webnp['title']} - {webnp['artist']}"
                         payload["small_image"] = self.config["other_media"][webnp["player"]]["icon"]
                         if webnp["player"] == "Twitch":
-                            payload = self.add_button(payload, {"label": "Watch on Twitch", "url": f"https://twitch.tv/{webnp['artist'].lower()}"})
+                            media_button = {"label": "Watch on Twitch", "url": f"https://twitch.tv/{webnp['artist'].lower()}"}
                         duration_read = webnp["duration"].split(":")[::-1]
                         position_read = webnp["position"].split(":")[::-1]
                         duration = 0
@@ -247,6 +242,14 @@ class CustomRPC():
                     client_id = process_info["client_id"]
                     payload["details"] = f"{time_info}"
                     payload["small_image"] = process_info["icon"]
+
+        if [media_button, extra_button] != [None, None]:
+            payload["buttons"] = []
+        if media_button is not None:
+            payload["buttons"].append(media_button)
+        if extra_button is not None:
+            payload["buttons"].append(extra_button)
+
 
         return client_id, payload
 
