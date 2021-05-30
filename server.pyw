@@ -4,6 +4,8 @@ import asyncio
 import websockets
 from json import dumps
 from time import time
+import logging
+import sys
 
 
 class Client:
@@ -30,9 +32,25 @@ class Client:
 
 class WebNowPlaying:
     def __init__(self, port, loop=None):
+        self.version = "0.5.0.0"
 
         self.clients = {}
         self.playing_order = []
+
+        self.format = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
+        self.log_level = logging.DEBUG
+        self.log = logging.getLogger("customrpc server")
+        self.log.setLevel(self.log_level)
+
+        fhandler = logging.FileHandler(filename="server.log", encoding="utf-8", mode="w+")
+        fhandler.setLevel(logging.WARNING)
+        fhandler.setFormatter(self.format)
+        self.log.addHandler(fhandler)
+
+        chandler = logging.StreamHandler(sys.stdout)                             
+        chandler.setLevel(self.log_level)
+        chandler.setFormatter(self.format)                                        
+        self.log.addHandler(chandler)
 
         start_server = websockets.serve(self.handler, "localhost", port)
         if loop is None:
@@ -55,16 +73,17 @@ class WebNowPlaying:
 
                 if self.clients.get(id, None) is None:
                     self.clients[id] = Client(id=id)
-                    print(f"Tab opened")
+                    await websocket.send(f"Version:{self.version}")
+                    self.log.debug(f"Tab opened")
 
                 if attribute == "state":
                     if data == "1" and self.clients[id].state in ["2", None]:
-                        print(f"Set playing for {self.clients[id].artist}")
+                        self.log.debug(f"Set playing for {self.clients[id].artist}")
                         self.playing_order.append(id)
 
                 if attribute == "state":
                     if data == "2" and self.clients[id].state == "1":
-                        print(f"Set paused for {self.clients[id].artist}")
+                        self.log.debug(f"Set paused for {self.clients[id].artist}")
                         self.playing_order.remove(id)
                         force_update = True
 
@@ -85,10 +104,10 @@ class WebNowPlaying:
             del self.clients[id]
             if len(self.clients.keys()) > 0:
                 recent = list(self.clients.keys())[-1]
-                print(f"Tab closed for {old_tab}, restoring to {self.clients[recent].artist}")
+                self.log.debug(f"Tab closed for {old_tab}, restoring to {self.clients[recent].artist}")
                 await self.update(id=recent)
             else:
-                print(f"Tab closed for {old_tab}, nothing to restore to")
+                self.log.debug(f"Tab closed for {old_tab}, nothing to restore to")
                 with open("info.json", "w") as f:
                     f.write("")
 
@@ -97,7 +116,7 @@ class WebNowPlaying:
         if self.playing_order != [] or id is not None:
             if id is not None:
                 client = self.clients[id]
-                print(f"Force update for {client.artist}")
+                self.log.debug(f"Force update for {client.artist}")
             else:
                 client = self.clients[self.playing_order[-1]]
 
@@ -109,5 +128,7 @@ if __name__ == "__main__":
     try:
         w.run()
     except KeyboardInterrupt:
-        with open("info.json", "w") as f:
+        pass
+    finally:
+        with open("info.json", "w") as f: #Clear file on exit
             f.write("")

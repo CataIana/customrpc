@@ -1,8 +1,4 @@
 pypresence
 psutil
 spotipy
-
-openpyxl
-
-qdarkstyle
-PyQt5
+xml_to_dict

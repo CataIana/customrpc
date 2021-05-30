@@ -28,8 +28,8 @@ class CustomRPC():
         self.log = logging.getLogger("customrpc")
         self.log.setLevel(self.log_level)
 
-        fhandler = logging.FileHandler(filename="rpc.log", encoding="utf-8", mode="a+")
-        fhandler.setLevel(logging.INFO)
+        fhandler = logging.FileHandler(filename="rpc.log", encoding="utf-8", mode="w+")
+        fhandler.setLevel(logging.WARNING)
         fhandler.setFormatter(self.format)
         self.log.addHandler(fhandler)
 
@@ -134,6 +134,7 @@ class CustomRPC():
                         else:
                             payload["start"] = int(
                                 time() - int(spotify["progress_ms"]/1000))
+                        payload["small_image"] = self.config["spotify_icon"]
                     except KeyError as e:
                         formatted_exception = "Traceback (most recent call last):\n" + ''.join(format_tb(e.__traceback__)) + f"{type(e).__name__}: {e}"
                         self.log.error(formatted_exception)

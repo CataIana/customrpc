@@ -1,0 +1,45 @@
+{
+    "spotify": {
+        "username": "",
+        "client_id": "",
+        "client_secret": "",
+        "redirect_uri": "http://localhost:9000/"
+    },
+    "fallback_details": "uwu hi",
+    "fallback_state": "mew :3",
+    "fallback_largetext": "Message me and I'll say congrats for finding this lol",
+    "use_extra_button": false,
+    "extra_button": {"label": "Hello", "url": "https://www.google.com.au"},
+    "spotify_cid": 453453,
+    "vlc_cid": 435345,
+    "default_cid": 3534543,
+    "other_media": {
+        "Twitch": {"client_id": 343554, "icon": "twitch"},
+        "Youtube": {"client_id": 5345435, "icon": "yt"}
+    },
+    "games": {
+        "overwatch.exe": {
+            "client_id": 5435345,
+            "name": "Overwatch",
+            "icon": "ow"
+        },
+        "code.exe": {
+            "client_id": 543543,
+            "name": "Visual Studio Code",
+            "icon": "vscode"
+        },
+		"gta5.exe": {
+			"client_id": 34535676,
+			"name": "Grand Theft Auto V",
+			"icon": "gtav"
+		}
+    },
+    "show_spotify": true,
+    "use_time_left_media": false,
+    "show_other_media": true,
+    "vlc_http_password": "",
+    "vlc_icon": "vlc",
+    "spotify_icon": "spotify",
+    "show_games": true,
+    "large_image_names": []
+}

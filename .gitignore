@@ -1,23 +1,14 @@
 __pycache__
+*.log
+rpc icons
+config.json
+.cache*
+.vscode
+info.json
+
+
 *pyc
 *pyo
 */lib
-*/*/lib
-*/*/*.dll
-*/*.dll
-*/*/*.exe
-*/*.exe
-rainmeter skin/@Resources/images/coverWeb.png
-rainmeter skin/@Resources/music.txt
-data/*
-*/*/*.log
-*/*.log
-rpc icons
-config.json
-*/config.json
-*/.cache*
-.cache*
-*/testing*
-.vscode
-*/.vscode
-info.json
+*.dll
+*.exe
