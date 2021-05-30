@@ -22,7 +22,8 @@ class CustomRPC():
         with open(f"{getcwd()}/config.json") as f:
             self.config = j_load(f)
 
-        signal.signal(signal.SIGINT, self.close)
+        if __name__ == "__main__":
+            signal.signal(signal.SIGINT, self.close)
         self.format = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
         self.log_level = logging.DEBUG
         self.log = logging.getLogger("customrpc")
@@ -294,10 +295,13 @@ class CustomRPC():
             pass
         sys.exit()
 
+    def get_traceback(self):
+        return "Traceback (most recent call last):\n" + ''.join(format_tb(e.__traceback__)) + f"{type(e).__name__}: {e}"
 
-rpc = CustomRPC()
-while True:
-    try:
-        rpc.main()
-    except Exception as e:
-        rpc.log.error("Traceback (most recent call last):\n" + ''.join(format_tb(e.__traceback__)) + f"{type(e).__name__}: {e}")
+if __name__ == "__main__":
+    rpc = CustomRPC()
+    while True:
+        try:
+            rpc.main()
+        except Exception as e:
+            rpc.log.error(rpc.get_traceback())
