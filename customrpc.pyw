@@ -8,7 +8,7 @@ from psutil import process_iter, boot_time
 from spotipy import Spotify, SpotifyException
 from pypresence import Presence
 from pypresence.exceptions import InvalidID, InvalidPipe
-from time import localtime, strftime
+from time import localtime, strftime, sleep
 from requests import get
 from xml_to_dict import XMLtoDict
 import logging
@@ -139,43 +139,43 @@ class CustomRPC():
                         formatted_exception = "Traceback (most recent call last):\n" + ''.join(format_tb(e.__traceback__)) + f"{type(e).__name__}: {e}"
                         self.log.error(formatted_exception)
         if self.config["show_other_media"] or self.config["show_games"]:
-            processes = {p.name(): {"object": p, "info": self.config["games"].get(p.name().lower(), None)} for p in process_iter(['name', 'status']) if p.name().lower() in (list(self.config["games"].keys())+["vlc.exe"])}
+            games = list(self.config["games"].keys())+["vlc.exe"]
+            processes = {p.name(): {"object": p, "info": self.config["games"].get(p.name().lower(), None)} for p in process_iter() if p.name().lower() in games}
         if self.config["show_other_media"]:
             process = processes.get("vlc.exe", None)
             if process is not None:
                 process_info = process["info"]
-                with process["object"].oneshot():
+                try:
+                    r = get("http://localhost:8080/requests/status.xml", verify=False, auth=("", self.config["vlc_http_password"]), timeout=2)
+                except ConnectionError as e:
+                    pass
+                    self.log.debug(f"Connection error processing VLC dict: {e}")
+                else:
                     try:
-                        r = get("http://localhost:8080/requests/status.xml", verify=False, auth=("", self.config["vlc_http_password"]), timeout=2)
-                    except ConnectionError as e:
-                        pass
-                        self.log.debug(f"Connection error processing VLC dict: {e}")
-                    else:
-                        try:
-                            p = self.xml_parser.parse(r.text)["root"]
-                            if p["state"] == "playing":
-                                vlctitle = None
-                                vlcartist = None
-                                for x in p["information"]["category"][0]["info"]:
-                                    if type(p["information"]["category"][0]["info"]) is not list:
-                                        x = p["information"]["category"][0]["info"]
-                                    if x["@name"] == "title":
-                                        vlctitle = x["#text"]
-                                    if x["@name"] == "filename":
-                                        vlcfilename = x["#text"]
-                                    if x["@name"] == "artist":
-                                        vlcartist = x["#text"]
-                                if vlctitle is None:
-                                    vlctitle = vlcfilename
-                                payload["state"] = f"{vlctitle} - {vlcartist}"[:112]
-                                if self.config["use_time_left_media"] == True:
-                                    payload["end"] = int(time() + int(p["time"]))
-                                else:
-                                    payload["start"] = int(time() - int(p["time"]))
-                                payload["small_image"] = self.config["vlc_icon"]
-                                client_id = self.config["vlc_cid"]
-                        except KeyError as e:
-                            self.log.debug(f"KeyError processing VLC dict: {e}")
+                        p = self.xml_parser.parse(r.text)["root"]
+                        if p["state"] == "playing":
+                            vlctitle = None
+                            vlcartist = None
+                            for x in p["information"]["category"][0]["info"]:
+                                if type(p["information"]["category"][0]["info"]) is not list:
+                                    x = p["information"]["category"][0]["info"]
+                                if x["@name"] == "title":
+                                    vlctitle = x["#text"]
+                                if x["@name"] == "filename":
+                                    vlcfilename = x["#text"]
+                                if x["@name"] == "artist":
+                                    vlcartist = x["#text"]
+                            if vlctitle is None:
+                                vlctitle = vlcfilename
+                            payload["state"] = f"{vlctitle} - {vlcartist}"[:112]
+                            if self.config["use_time_left_media"] == True:
+                                payload["end"] = int(time() + int(p["time"]))
+                            else:
+                                payload["start"] = int(time() - int(p["time"]))
+                            payload["small_image"] = self.config["vlc_icon"]
+                            client_id = self.config["vlc_cid"]
+                    except KeyError as e:
+                        self.log.debug(f"KeyError processing VLC dict: {e}")
 
             webnp = {}
             failed = 0
@@ -216,33 +216,32 @@ class CustomRPC():
                             payload["end"] = int(time() + (duration - position))
                         else:
                             payload["start"] = int(time() - position)
-        processes.pop("vlc.exe", None)
         if self.config["show_games"]:
             if processes != {}:
+                processes.pop("vlc.exe", None)
                 process = list(processes.values())[0]
-                with process["object"].oneshot():
-                    process_info = process["info"]
-                    if self.prev_cid != process_info["client_id"]:
-                        self.log.debug(
-                            f"Matched process {process['object'].name()} to client ID {process_info['client_id']} with name {process_info['name']}")
-                    try:
-                        create_time = process["object"].create_time()
-                    except OSError:
-                        # system processes, using boot time instead
-                        create_time = boot_time()
-                    epoch = time() - create_time
-                    conv = {
-                        "days": str(epoch // 86400).split('.')[0],
-                        "hours": str(epoch // 3600 % 24).split('.')[0],
-                        "minutes": str(epoch // 60 % 60).split('.')[0],
-                        "seconds": str(epoch % 60).split('.')[0],
-                        "full": strftime('%Y-%m-%d %I:%M:%S %p %Z', localtime(create_time))
-                    }
-                    time_info = f"for {conv['days'] if conv['days'] != '0' else ''}{'' if conv['days'] == '0' else 'd, '}{conv['hours'] if conv['hours'] != '0' else ''}{'' if conv['hours'] == '0' else 'h, '}{conv['minutes'] if conv['minutes'] != '0' else ''}{'' if conv['minutes'] == '0' else 'm'}"
+                process_info = process["info"]
+                if self.prev_cid != process_info["client_id"]:
+                    self.log.debug(
+                        f"Matched process {process['object'].name()} to client ID {process_info['client_id']} with name {process_info['name']}")
+                try:
+                    create_time = process["object"].create_time()
+                except OSError:
+                    # system processes, using boot time instead
+                    create_time = boot_time()
+                epoch = time() - create_time
+                conv = {
+                    "days": str(epoch // 86400).split('.')[0],
+                    "hours": str(epoch // 3600 % 24).split('.')[0],
+                    "minutes": str(epoch // 60 % 60).split('.')[0],
+                    "seconds": str(epoch % 60).split('.')[0],
+                    "full": strftime('%Y-%m-%d %I:%M:%S %p %Z', localtime(create_time))
+                }
+                time_info = f"for {conv['days'] if conv['days'] != '0' else ''}{'' if conv['days'] == '0' else 'd, '}{conv['hours'] if conv['hours'] != '0' else ''}{'' if conv['hours'] == '0' else 'h, '}{conv['minutes'] if conv['minutes'] != '0' else ''}{'' if conv['minutes'] == '0' else 'm'}"
 
-                    client_id = process_info["client_id"]
-                    payload["details"] = f"{time_info}"
-                    payload["small_image"] = process_info["icon"]
+                client_id = process_info["client_id"]
+                payload["details"] = f"{time_info}"
+                payload["small_image"] = process_info["icon"]
 
         if [media_button, extra_button] != [None, None]:
             payload["buttons"] = []
