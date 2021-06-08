@@ -108,7 +108,7 @@ class WebNowPlaying:
                 await self.update(id=recent)
             else:
                 self.log.debug(f"Tab closed for {old_tab}, nothing to restore to")
-                with open("info.json", "w") as f:
+                with open(".info.json", "w") as f:
                     f.write("")
 
 
@@ -120,7 +120,7 @@ class WebNowPlaying:
             else:
                 client = self.clients[self.playing_order[-1]]
 
-            with open("info.json", "w") as f:
+            with open(".info.json", "w") as f:
                 f.write(dumps(client.get_dict(), indent=4))
 
 if __name__ == "__main__":
@@ -130,5 +130,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     finally:
-        with open("info.json", "w") as f: #Clear file on exit
+        with open(".info.json", "w") as f: #Clear file on exit
             f.write("")

@@ -182,7 +182,7 @@ class CustomRPC():
             failed = 0
             while webnp == {}:
                 try:
-                    with open("info.json") as f:
+                    with open(".info.json") as f:
                         webnp = j_load(f)
                 except JSONDecodeError:
                     failed += 1
@@ -201,6 +201,8 @@ class CustomRPC():
                         payload["small_image"] = self.config["other_media"][webnp["player"]]["icon"]
                         if webnp["player"] == "Twitch":
                             media_button = {"label": "Watch on Twitch", "url": f"https://twitch.tv/{webnp['artist'].lower()}"}
+                        else:
+                            media_button = None
                         duration_read = webnp["duration"].split(":")[::-1]
                         position_read = webnp["position"].split(":")[::-1]
                         duration = 0
