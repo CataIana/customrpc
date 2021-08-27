@@ -241,6 +241,8 @@ class CustomRPC():
                     "full": strftime('%Y-%m-%d %I:%M:%S %p %Z', localtime(create_time))
                 }
                 time_info = f"for {conv['days'] if conv['days'] != '0' else ''}{'' if conv['days'] == '0' else 'd, '}{conv['hours'] if conv['hours'] != '0' else ''}{'' if conv['hours'] == '0' else 'h, '}{conv['minutes'] if conv['minutes'] != '0' else ''}{'' if conv['minutes'] == '0' else 'm'}"
+                if time_info == "for ":
+                    time_info = "0m"
 
                 client_id = process_info["client_id"]
                 payload["details"] = f"{time_info}"
@@ -261,22 +263,26 @@ class CustomRPC():
         if self.prev_cid != client_id:
             self.log.info(f"Switching from {self.prev_cid} to {client_id}")
             self.prev_cid = client_id
-            self.reconnect(client_id=client_id)
-        if not self.connected:
+            if client_id is not None:
+                self.reconnect(client_id=client_id)
+            else:
+                self.RPC.clear()
+        if not self.connected and client_id is not None:
             self.reconnect(client_id=client_id)
         if not self.same_payload(payload):
             self.log.debug(f"Setting presence with payload {payload}")
-            while True:
-                try:
-                    self.RPC.update(**payload)
-                except InvalidID:
-                    self.log.warning("Invalid ID, restarting...")
-                    self.reconnect(client_id=client_id)
-                except InvalidPipe:
-                    self.log.warning("InvalidPipe, is discord running? Reconnecting...")
-                    self.reconnect(client_id=client_id)
-                else:
-                    break
+            if client_id is not None:
+                while True:
+                    try:
+                        self.RPC.update(**payload)
+                    except InvalidID:
+                        self.log.warning("Invalid ID, restarting...")
+                        self.reconnect(client_id=client_id)
+                    except InvalidPipe:
+                        self.log.warning("InvalidPipe, is discord running? Reconnecting...")
+                        self.reconnect(client_id=client_id)
+                    else:
+                        break
             sleep(15)
         else:
             self.log.debug("Ignoring same payload")
