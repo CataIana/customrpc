@@ -16,6 +16,10 @@ import sys
 import signal
 from traceback import format_tb
 
+class NoRPC:
+    def __str__(self):
+        return "No RPC"
+
 
 class CustomRPC():
     def __init__(self):
@@ -224,6 +228,8 @@ class CustomRPC():
                 processes.pop("vlc.exe", None)
                 process = list(processes.values())[0]
                 process_info = process["info"]
+                if process_info["client_id"] == None:
+                    process_info["client_id"] = NoRPC
                 if self.prev_cid != process_info["client_id"]:
                     self.log.debug(
                         f"Matched process {process['object'].name()} to client ID {process_info['client_id']} with name {process_info['name']}")
@@ -241,12 +247,10 @@ class CustomRPC():
                     "full": strftime('%Y-%m-%d %I:%M:%S %p %Z', localtime(create_time))
                 }
                 time_info = f"for {conv['days'] if conv['days'] != '0' else ''}{'' if conv['days'] == '0' else 'd, '}{conv['hours'] if conv['hours'] != '0' else ''}{'' if conv['hours'] == '0' else 'h, '}{conv['minutes'] if conv['minutes'] != '0' else ''}{'' if conv['minutes'] == '0' else 'm'}"
-                if time_info == "for ":
-                    time_info = "0m"
 
                 client_id = process_info["client_id"]
                 payload["details"] = f"{time_info}"
-                payload["small_image"] = process_info["icon"]
+                payload["small_image"] = process_info.get("icon", None)
 
         if [media_button, extra_button] != [None, None]:
             payload["buttons"] = []
@@ -263,15 +267,16 @@ class CustomRPC():
         if self.prev_cid != client_id:
             self.log.info(f"Switching from {self.prev_cid} to {client_id}")
             self.prev_cid = client_id
-            if client_id is not None:
+            if client_id != NoRPC:
                 self.reconnect(client_id=client_id)
             else:
-                self.RPC.clear()
-        if not self.connected and client_id is not None:
+                if self.connected:
+                    self.RPC.clear()
+        if not self.connected and client_id != NoRPC:
             self.reconnect(client_id=client_id)
         if not self.same_payload(payload):
             self.log.debug(f"Setting presence with payload {payload}")
-            if client_id is not None:
+            if client_id != NoRPC:
                 while True:
                     try:
                         self.RPC.update(**payload)
