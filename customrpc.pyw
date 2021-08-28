@@ -246,7 +246,7 @@ class CustomRPC():
 
                 client_id = process_info["client_id"]
                 payload["details"] = f"{time_info}"
-                payload["small_image"] = process_info.get("icon", None)
+                payload["small_image"] = process_info["icon"]
 
         if [media_button, extra_button] != [None, None]:
             payload["buttons"] = []
