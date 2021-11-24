@@ -2,10 +2,9 @@ from time import time, sleep
 from json.decoder import JSONDecodeError
 from json import load as j_load
 from random import choice
-import spotipy.util as util
 from os import getcwd
 from psutil import process_iter, boot_time
-from spotipy import Spotify, SpotifyException
+from spotipy import Spotify, SpotifyException, SpotifyOAuth
 from pypresence import Presence
 from pypresence.exceptions import InvalidID, InvalidPipe
 from time import localtime, strftime, sleep
@@ -52,9 +51,8 @@ class CustomRPC():
 
     def auth_spotify(self):
         self.log.debug("Authorising Spotify")
-        token = util.prompt_for_user_token(
-            scope="user-read-currently-playing user-read-playback-state", **self.config["spotify"])
-        self.sp = Spotify(auth=token)
+        auth_manager=SpotifyOAuth(scope="user-read-currently-playing user-read-playback-state", **self.config["spotify"])
+        self.sp = Spotify(auth_manager=auth_manager)
 
     def reconnect(self, client_id=None):
         if client_id is None:
@@ -205,6 +203,7 @@ class CustomRPC():
                         payload["small_image"] = self.config["other_media"][webnp["player"]]["icon"]
                         if webnp["player"] == "Twitch":
                             media_button = {"label": "Watch on Twitch", "url": f"https://twitch.tv/{webnp['artist'].lower()}"}
+                            payload["state"] = f"Watching {webnp['artist']} on Twitch"
                         else:
                             media_button = None
                         duration_read = webnp["duration"].split(":")[::-1]

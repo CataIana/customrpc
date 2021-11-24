@@ -74,17 +74,18 @@ class WebNowPlaying:
                 if self.clients.get(id, None) is None:
                     self.clients[id] = Client(id=id)
                     await websocket.send(f"Version:{self.version}")
-                    self.log.debug(f"Tab opened")
+                    self.log.debug(f"Tab opened with ID {id}")
 
                 if attribute == "state":
                     if data == "1" and self.clients[id].state in ["2", None]:
-                        self.log.debug(f"Set playing for {self.clients[id].artist}")
+                        self.log.debug(f"Set playing for {self.clients[id].artist} with ID {id}")
                         self.playing_order.append(id)
 
                 if attribute == "state":
                     if data == "2" and self.clients[id].state == "1":
-                        self.log.debug(f"Set paused for {self.clients[id].artist}")
-                        self.playing_order.remove(id)
+                        self.log.debug(f"Set paused for {self.clients[id].artist} with ID {id}")
+                        if id in self.playing_order:
+                            self.playing_order.remove(id)
                         force_update = True
 
                 setattr(self.clients[id], attribute, data)
@@ -130,5 +131,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     finally:
+        w.log.info("Stopping...")
         with open(".info.json", "w") as f: #Clear file on exit
             f.write("")
