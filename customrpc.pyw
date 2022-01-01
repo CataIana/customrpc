@@ -14,7 +14,6 @@ import logging
 import sys
 import signal
 from traceback import format_tb
-from disnake.utils import MISSING
 
 class Empty:
     def __eq__(self, other):
