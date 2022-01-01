@@ -14,10 +14,20 @@ import logging
 import sys
 import signal
 from traceback import format_tb
+from disnake.utils import MISSING
 
-class NoRPC:
-    def __str__(self):
+class Empty:
+    def __eq__(self, other):
+        return False
+
+    def __bool__(self):
+        return False
+
+    def __repr__(self):
         return "No RPC"
+
+
+NoRPC = Empty()
 
 
 class CustomRPC():
@@ -225,7 +235,8 @@ class CustomRPC():
         if self.config["show_games"]:
             if processes != {}:
                 processes.pop("vlc.exe", None)
-                process = list(processes.values())[0]
+                sorted_processes = sorted([p for p in list(processes.values())], key=lambda p: p["object"].pid, reverse=True)
+                process = sorted_processes[0]
                 process_info = process["info"]
                 if process_info["client_id"] == None:
                     process_info["client_id"] = NoRPC
