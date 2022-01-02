@@ -14,7 +14,6 @@ import logging
 import sys
 import signal
 from traceback import format_tb
-from typing import Tuple
 
 #This class is just intended to be something that more or less mimics None without it actually being a nonetype
 # It's used as a fill in for when a Client ID is not provided for an application
@@ -118,14 +117,14 @@ class CustomRPC():
     # Simple function to compare if 2 numbers are within 3 seconds of them. 
     # Sometimes the start/end times can be a second or two off and we don't want to update because of that
     # I just googled this
-    def compare_times(self, a, b):
+    def compare_times(self, a, b) -> bool:
         try:
             if abs(a-b) < 3:
                 return True
         except TypeError:
             return True
 
-    def get_payload(self) -> Tuple(int, dict):
+    def get_payload(self):
         extra_button = None # Set as none to prevent issues
         media_button = None
         payload = { # Set payload to fallback information. They will be replaced if necessary
@@ -335,7 +334,7 @@ class CustomRPC():
             pass
         sys.exit()
 
-    def get_traceback(self):
+    def get_traceback(self) -> str:
         return "Traceback (most recent call last):\n" + ''.join(format_tb(e.__traceback__)) + f"{type(e).__name__}: {e}"
 
 if __name__ == "__main__":
