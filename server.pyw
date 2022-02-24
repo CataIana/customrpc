@@ -25,7 +25,7 @@ class Client:
         self.cover = None
         self.last_update = time()
 
-    def get_dict(self):
+    def to_dict(self):
         return {"player": self.player, "state": self.state, "title": self.title, "artist": self.artist, "album": self.album, "duration": self.duration, "position": self.position,
                 "volume": self.volume, "rating": self.rating, "repeat": self.repeat, "shuffle": self.shuffle, "cover": self.cover, "last_update": self.last_update}
 
@@ -122,7 +122,7 @@ class WebNowPlaying:
                 client = self.clients[self.playing_order[-1]]
 
             with open(".info.json", "w") as f:
-                f.write(dumps(client.get_dict(), indent=4))
+                f.write(dumps(client.to_dict(), indent=4))
 
 if __name__ == "__main__":
     w = WebNowPlaying(port=8975)

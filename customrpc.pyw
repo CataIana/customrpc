@@ -6,7 +6,8 @@ from os import getcwd
 from psutil import process_iter, boot_time
 from spotipy import Spotify, SpotifyException, SpotifyOAuth
 from pypresence import Presence
-from pypresence.exceptions import InvalidID, InvalidPipe
+from pypresence.exceptions import InvalidID, InvalidPipe, DiscordError, DiscordNotFound
+from dataclasses import dataclass
 from time import localtime, strftime, sleep
 from requests import get
 from xml_to_dict import XMLtoDict
@@ -14,6 +15,7 @@ import logging
 import sys
 import signal
 from traceback import format_tb
+from typing import Optional
 
 #This class is just intended to be something that more or less mimics None without it actually being a nonetype
 # It's used as a fill in for when a Client ID is not provided for an application
@@ -27,8 +29,63 @@ class Empty:
     def __repr__(self):
         return "No RPC"
 
-
 NoRPC = Empty()
+
+@dataclass
+class Button:
+    label: str
+    url: str
+
+@dataclass
+class Payload:
+    state: str
+    details: str
+    small_image: str = None
+    small_text: str = None
+    large_image: str = None
+    large_text: str = None
+    start: int = None
+    end: int = None
+    buttons: list = None
+
+    def to_dict(self):
+        return self.__dict__
+
+    def add_button(self, button: Button):
+        if self.buttons is None:
+            self.buttons = []
+        if len(self.buttons) < 2:
+            self.buttons.append(button)
+        else:
+            raise TypeError("Cannot add more than 2 buttons!")
+
+    def __str__(self):
+        return str({k:v for k,v in self.__dict__.items() if v})
+
+    def __repr__(self):
+        return repr(str(self.__dict__))
+    
+    # Simple function to compare if 2 numbers are within 3 seconds of them. 
+    # Sometimes the start/end times can be a second or two off and we don't want to update because of that
+    # I just googled this
+    def compare_times(self, a: int, b: int) -> bool:
+        try:
+            if abs(a-b) < 3:
+                return True
+        except TypeError:
+            return True
+
+    def __eq__(self, other):
+        for x, y in self.__dict__.items():
+            if x in ["large_image", "small_image"]:  # Things to not bother comparing
+                continue
+            if x in ["start", "end"]:
+                if not self.compare_times(getattr(other, x, None), y):
+                    return False
+            else:
+                if getattr(other, x, None) != y:
+                    return False
+        return True
 
 
 class CustomRPC():
@@ -59,8 +116,9 @@ class CustomRPC():
 
         self.prev_cid = None # The last client ID used for connecting. Used for comparasions
         self.connected = False # If the RPC is currently connected. This can only really be assumed 
-        self.previous_payload = None # Temporary var for comparing between payloads to decide if we need to send an update to discord
+        self.previous_payload: Optional[Payload] = None # Temporary var for comparing between payloads to decide if we need to send an update to discord
         self.force_update = True # If we should be updating the RPC no matter what. Generally used for Client ID switching and reconnections
+        self.last_update = 0
         self.auth_spotify() # Authorize spotify, so we can connect an pull data. 
         self.xml_parser = XMLtoDict() # Used for parsing VLC data, since it replies in XML
 
@@ -76,18 +134,21 @@ class CustomRPC():
             self.RPC.close()
             self.connected = False
         self.log.info(f"Connecting with Client ID {client_id}")
-        self.RPC = Presence(client_id=client_id) # Reinit presence class
         while True: # Loop indefinitely until connection is established. Will loop here if discord isn't open
             try:
+                self.RPC = Presence(client_id=client_id) # Reinit presence class
                 self.RPC.connect()
             except InvalidID as e:
-                sleep(2)
                 self.log.debug(f"Retrying... ({e})")
             except InvalidPipe as e:
-                sleep(2)
+                self.log.debug(f"Retrying... ({e})")
+            except DiscordError:
+                self.log.debug(f"Retrying... ({e})")
+            except DiscordNotFound:
                 self.log.debug(f"Retrying... ({e})")
             else:
                 break
+            sleep(2)
         self.log.info("Connected")
         self.force_update = True # Client ID switched, ensure we update no matter what
         self.connected = True # Since we escaped the loop, we must be connected
@@ -101,38 +162,16 @@ class CustomRPC():
         if self.force_update:
             self.force_update = False
             return False
-        for x, y in payload.items():
-            if x in ["large_image", "small_image"]:  # Things to not bother comparing
-                continue
-            if x in ["start", "end"]:
-                if not self.compare_times(self.previous_payload.get(x, None), y):
-                    self.previous_payload = payload
-                    return False
-            else:
-                if self.previous_payload.get(x, None) != y:
-                    self.previous_payload = payload
-                    return False
-        return True
-
-    # Simple function to compare if 2 numbers are within 3 seconds of them. 
-    # Sometimes the start/end times can be a second or two off and we don't want to update because of that
-    # I just googled this
-    def compare_times(self, a, b) -> bool:
-        try:
-            if abs(a-b) < 3:
-                return True
-        except TypeError:
-            return True
+        return payload == self.previous_payload
 
     def get_payload(self):
         extra_button = None # Set as none to prevent issues
         media_button = None
-        payload = { # Set payload to fallback information. They will be replaced if necessary
-            "details": self.config["fallback_details"],
-            "state": self.config["fallback_state"],
-            "large_image": choice(self.config["large_image_names"]),
-            "large_text": self.config["fallback_largetext"]
-        }
+        # Set payload to fallback information. They will be replaced if necessary
+        payload = Payload(details = self.config["fallback_details"],
+            state = self.config["fallback_state"],
+            large_image = choice(self.config["large_image_names"]).lower(),
+            large_text = self.config["fallback_largetext"])
         if self.config["use_extra_button"]: # If enabled, use the extra button information set in the config
             extra_button = self.config["extra_button"]
         client_id = None 
@@ -140,8 +179,13 @@ class CustomRPC():
             try:
                 spotify = self.sp.current_user_playing_track()
             except SpotifyException:
-                self.auth_spotify()
-                spotify = self.sp.current_user_playing_track()
+                try:
+                    self.auth_spotify()
+                except SpotifyException:
+                    self.log.error("Unable to connect to spotify!")
+                    spotify = None
+                else:
+                    spotify = self.sp.current_user_playing_track()
             if spotify is None:
                 client_id = None
             else:
@@ -151,14 +195,14 @@ class CustomRPC():
                     try: # Otherwise, form the data, creating the "Play on spotify" button and displaying the song name - artist
                         # And do some maths to make the start/end time, depending on whichever the config says to use. 
                         # This is an epoch/unix time and we just minus/plus the progress
-                        payload["state"] = f"{spotify['item']['name']} - {spotify['item']['artists'][0]['name']}"
+                        payload.state = f"{spotify['item']['name']} - {spotify['item']['artists'][0]['name']}"
                         media_button = {"label": "Play on Spotify", "url": spotify["item"]["external_urls"]["spotify"]}
                         client_id = self.config["spotify_cid"] # Set the spotify Client ID
                         if self.config["use_time_left_media"] == True:
-                            payload["end"] = time() + (int(spotify["item"]["duration_ms"]/1000) - int(spotify["progress_ms"]/1000))
+                            payload.end = time() + (int(spotify["item"]["duration_ms"]/1000) - int(spotify["progress_ms"]/1000))
                         else:
-                            payload["start"] = int(time() - int(spotify["progress_ms"]/1000))
-                        payload["small_image"] = self.config["spotify_icon"] # Get small image spotify icon
+                            payload.start = int(time() - int(spotify["progress_ms"]/1000))
+                        payload.small_image = self.config["spotify_icon"] # Get small image spotify icon
                     except KeyError as e: # If something failed, just log it and move on
                         formatted_exception = "Traceback (most recent call last):\n" + ''.join(format_tb(e.__traceback__)) + f"{type(e).__name__}: {e}"
                         self.log.error(formatted_exception)
@@ -194,12 +238,12 @@ class CustomRPC():
                                     vlcartist = x["#text"]
                             if vlctitle is None:
                                 vlctitle = vlcfilename
-                            payload["state"] = f"{vlctitle} - {vlcartist}"[:112] #Ensure that the name doesn't hit the character limit, limiting it to 112 characters
+                            payload.state = f"{vlctitle}{' - ' if vlcartist else ''}{vlcartist if vlcartist else ''}"[:112] #Ensure that the name doesn't hit the character limit, limiting it to 112 characters
                             if self.config["use_time_left_media"] == True: # Set unix time of start/end time
-                                payload["end"] = int(time() + int(p["time"]))
+                                payload.end = int(time() + int(p["time"]))
                             else:
-                                payload["start"] = int(time() - int(p["time"]))
-                            payload["small_image"] = self.config["vlc_icon"] # And finally set small icon and client ID, since we know everything else worked
+                                payload.start = int(time() - int(p["time"]))
+                            payload.small_image = self.config["vlc_icon"] # And finally set small icon and client ID, since we know everything else worked
                             client_id = self.config["vlc_cid"]
                     except KeyError as e: #In case any weird errors occured fetching data, I'd wanna find out why
                         self.log.debug(f"KeyError processing VLC dict: {e}")
@@ -221,13 +265,17 @@ class CustomRPC():
                     if webnp["player"] in self.config["other_media"].keys(): # Check if the player type is defined in the config, so we use their custom client ids/etc
                         client_id = self.config["other_media"][webnp["player"]]["client_id"]
                         if len(f"{webnp['title']} - {webnp['artist']}") > 128: # Run some weird maths to cut off the title if it is too long, while ensuring the artist length won't make it too long
-                            payload["state"] = f"{webnp['title'][:-(len(webnp['artist'])-(128-len(webnp['artist'])-3))]}... - {webnp['artist']}"
+                            payload.state = f"{webnp['title'][:-(len(webnp['artist'])-(128-len(webnp['artist'])-3))]}... - {webnp['artist']}"
                         else:
-                            payload["state"] = f"{webnp['title']} - {webnp['artist']}"
-                        payload["small_image"] = self.config["other_media"][webnp["player"]]["icon"] # Set the small image defined for the player
+                            payload.state = f"{webnp['title']} - {webnp['artist']}"
+                        payload.small_image = self.config["other_media"][webnp["player"]]["icon"] # Set the small image defined for the player
                         if webnp["player"] == "Twitch": # Hard coded stuff for twitch, giving a button for other people to click on to join the stream
                             media_button = {"label": "Watch on Twitch", "url": f"https://twitch.tv/{webnp['artist'].lower()}"}
-                            payload["state"] = f"Watching {webnp['artist']} on Twitch"
+                            payload.state = f"Watching {webnp['artist']} on Twitch"
+                        elif webnp["player"] == "Youtube":
+                            if webnp["cover"] != "":
+                                video_id = webnp["cover"].split("/")[-2]
+                                media_button = {"label": "Watch on Youtube", "url": f"https://youtube.com/watch?v={video_id}"}
                         else:
                             media_button = None
                         duration_read = webnp["duration"].split(":")[::-1]
@@ -243,12 +291,12 @@ class CustomRPC():
                             formatted_exception = "Traceback (most recent call last):\n" + ''.join(format_tb(e.__traceback__)) + f"{type(e).__name__}: {e}"
                             self.log.warning(formatted_exception)
                         if self.config["use_time_left_media"] == True:
-                            payload["end"] = int(time() + (duration - position))
+                            payload.end = int(time() + (duration - position))
                         else:
-                            payload["start"] = int(time() - position)
+                            payload.start = int(time() - position)
         if self.config["show_games"]: # If we want any games to show
+            processes.pop("vlc.exe", None)
             if processes != {}:
-                processes.pop("vlc.exe", None)
                 sorted_processes = sorted([p for p in list(processes.values())], key=lambda p: p["object"].pid, reverse=True) # Sort processes in order of oldest to newest using their PID
                 process = sorted_processes[0]
                 process_info = process["info"]
@@ -273,16 +321,15 @@ class CustomRPC():
                 time_info = f"for {conv['days'] if conv['days'] != '0' else ''}{'' if conv['days'] == '0' else 'd, '}{conv['hours'] if conv['hours'] != '0' else ''}{'' if conv['hours'] == '0' else 'h, '}{conv['minutes'] if conv['minutes'] != '0' else ''}{'' if conv['minutes'] == '0' else 'm'}"
 
                 client_id = process_info["client_id"] # Everything worked, set the client id
-                payload["details"] = f"{time_info}"
-                payload["small_image"] = process_info.get("icon", None)
+                payload.details = f"{time_info}"
+                payload.small_image = process_info.get("icon", None)
 
-        if [media_button, extra_button] != [None, None]: # Add any button that isn't a nonetype
-            payload["buttons"] = []
+        # if [media_button, extra_button] != [None, None]: # Add any button that isn't a nonetype
+        #     payload.buttons = []
         if media_button is not None:
-            payload["buttons"].append(media_button)
+            payload.add_button(media_button)
         if extra_button is not None:
-            payload["buttons"].append(extra_button)
-
+            payload.add_button(extra_button)
 
         return client_id, payload
 
@@ -298,12 +345,14 @@ class CustomRPC():
                     self.RPC.clear()
         if not self.connected and client_id != NoRPC: # If for some reason the RPC isn't connected and we have a client id, connect
             self.reconnect(client_id=client_id)
-        if not self.same_payload(payload): # Check if payloads are the same, and if not, push and update
+        if not self.same_payload(payload) or self.last_update+300 < time(): # Check if payloads are the same, and if not, push and update
+            self.previous_payload = payload
             self.log.debug(f"Setting presence with payload {payload}")
             if client_id != NoRPC:
                 while True:
                     try:
-                        self.RPC.update(**payload)
+                        self.RPC.update(**payload.to_dict())
+                        self.last_update = time()
                     # Errors usually occur if discord is restarted or killed and we try to update the RPC, 
                     # and since we don't have any other way to check, this is where the errors happen
                     except InvalidID: 
