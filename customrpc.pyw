@@ -170,7 +170,7 @@ class CustomRPC():
         # Set payload to fallback information. They will be replaced if necessary
         payload = Payload(details = self.config["fallback_details"],
             state = self.config["fallback_state"],
-            large_image = choice(self.config["large_image_names"]).lower(),
+            large_image = choice(self.config["large_image_urls"]).lower(),
             large_text = self.config["fallback_largetext"])
         if self.config["use_extra_button"]: # If enabled, use the extra button information set in the config
             extra_button = self.config["extra_button"]
@@ -274,8 +274,11 @@ class CustomRPC():
                             payload.state = f"Watching {webnp['artist']} on Twitch"
                         elif webnp["player"] == "Youtube":
                             if webnp["cover"] != "":
-                                video_id = webnp["cover"].split("/")[-2]
-                                media_button = {"label": "Watch on Youtube", "url": f"https://youtube.com/watch?v={video_id}"}
+                                try:
+                                    video_id = webnp["cover"].split("/")[-2]
+                                    media_button = {"label": "Watch on Youtube", "url": f"https://youtube.com/watch?v={video_id}"}
+                                except IndexError:
+                                    media_button = None
                         else:
                             media_button = None
                         duration_read = webnp["duration"].split(":")[::-1]

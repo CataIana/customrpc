@@ -41,5 +41,5 @@
     "vlc_icon": "vlc",
     "spotify_icon": "spotify",
     "show_games": true,
-    "large_image_names": []
+    "large_image_urls": []
 }
