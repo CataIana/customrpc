@@ -208,7 +208,7 @@ class CustomRPC():
                         self.log.error(formatted_exception)
         # If we want to show VLC or games, we need to fetch the process list, storing the data, along with their config information
         if self.config["show_other_media"] or self.config["show_games"]:
-            games = list(self.config["games"].keys())+["vlc.exe"]
+            games = list(self.config["games"].keys())+["vlc.exe"]+["plex.exe"]
             processes = {p.name(): {"object": p, "info": self.config["games"].get(p.name().lower(), None)} for p in process_iter() if p.name().lower() in games}
         if self.config["show_other_media"]:
             process = processes.get("vlc.exe", None) # Check if VLC is in the running processes list.
@@ -241,13 +241,42 @@ class CustomRPC():
                                 vlctitle = vlcfilename
                             payload.state = f"{vlctitle}{' - ' if vlcartist else ''}{vlcartist if vlcartist else ''}"[:112] #Ensure that the name doesn't hit the character limit, limiting it to 112 characters
                             if self.config["use_time_left_media"] == True: # Set unix time of start/end time
-                                payload.end = int(time() + int(p["time"]))
+                                payload.end = int(time() + (int(p["length"]) - int(p["time"])))
                             else:
                                 payload.start = int(time() - int(p["time"]))
                             payload.small_image = self.config["vlc_icon"] # And finally set small icon and client ID, since we know everything else worked
                             client_id = self.config["vlc_cid"]
                     except KeyError as e: #In case any weird errors occured fetching data, I'd wanna find out why
                         self.log.debug(f"KeyError processing VLC dict: {e}")
+
+            process = processes.get("Plex.exe", None) # Check if VLC is in the running processes list.
+            if process is not None:
+                process_info = process["info"]
+                try: # If Plex is running, make a request to it's API to fetch what if currently playing. If it fails, just ignore and move on. It does fail alot
+                    r = get("http://192.168.86.237:32400/status/sessions/?X-Plex-Token=3vMkbwVXRUGpxS9t6KaU")
+                except ConnectionError as e:
+                    self.log.debug(f"Connection error processing Plex XML: {e}")
+                except ConnectTimeout as e:
+                    self.log.debug(f"Connection error processing Plex XML: {e}")
+                else:
+                    try:
+                        # use the xml parser to parse the mess of response that VLC gives us
+                        p = self.xml_parser.parse(r.text)["MediaContainer"]["Video"]
+                        if p["Player"]["@state"] == "playing": # We only want to set to Plex if something is playing currently
+                            print(p["@type"])
+                            if p["@type"] == "episode":
+                                plextitle = f"{p['@grandparentTitle'][:104]} S{p['@parentIndex']} E{p['@index']}"
+                            elif p["@type"] == "movie":
+                                plextitle = f"{p['@title']}"[:112]
+                            payload.state = f"{plextitle}" #Ensure that the name doesn't hit the character limit, limiting it to 112 characters
+                            if self.config["use_time_left_media"] == True: # Set unix time of start/end time
+                                payload.end = int(time() + (int(p["@duration"])/1000 - int(p["@viewOffset"])/1000))
+                            else:
+                                payload.start = int(time() - int(p["@viewOffset"])/1000)
+                            payload.small_image = self.config["plex_icon"] # And finally set small icon and client ID, since we know everything else worked
+                            client_id = self.config["plex_cid"]
+                    except KeyError as e: #In case any weird errors occured fetching data, I'd wanna find out why
+                        self.log.debug(f"KeyError processing Plex XML: {e}")
 
             webnp = {}
             failed = 0
@@ -300,6 +329,7 @@ class CustomRPC():
                             payload.start = int(time() - position)
         if self.config["show_games"]: # If we want any games to show
             processes.pop("vlc.exe", None)
+            processes.pop("Plex.exe", None)
             if processes != {}:
                 sorted_processes = sorted([p for p in list(processes.values())], key=lambda p: p["object"].pid, reverse=True) # Sort processes in order of oldest to newest using their PID
                 process = sorted_processes[0]
