@@ -9,7 +9,7 @@ from pypresence import Presence
 from pypresence.exceptions import InvalidID, InvalidPipe, DiscordError, DiscordNotFound
 from dataclasses import dataclass
 from time import localtime, strftime, sleep
-from requests import get
+from requests import ConnectTimeout, get
 from xml_to_dict import XMLtoDict
 import logging
 import sys
@@ -142,9 +142,9 @@ class CustomRPC():
                 self.log.debug(f"Retrying... ({e})")
             except InvalidPipe as e:
                 self.log.debug(f"Retrying... ({e})")
-            except DiscordError:
+            except DiscordError as e:
                 self.log.debug(f"Retrying... ({e})")
-            except DiscordNotFound:
+            except DiscordNotFound as e:
                 self.log.debug(f"Retrying... ({e})")
             else:
                 break
@@ -217,7 +217,8 @@ class CustomRPC():
                 try: # If VLC is running, make a request to it's API to fetch what if currently playing. If it fails, just ignore and move on. It does fail alot
                     r = get("http://localhost:8080/requests/status.xml", verify=False, auth=("", self.config["vlc_http_password"]), timeout=2)
                 except ConnectionError as e:
-                    pass
+                    self.log.debug(f"Connection error processing VLC dict: {e}")
+                except ConnectTimeout as e:
                     self.log.debug(f"Connection error processing VLC dict: {e}")
                 else:
                     try:
