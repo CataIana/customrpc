@@ -4,11 +4,5 @@ rpc icons
 config.json
 .cache*
 .vscode
-.info.json
-
-
 *pyc
 *pyo
-*/lib
-*.dll
-*.exe
