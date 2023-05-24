@@ -2,8 +2,7 @@ import logging
 import signal
 import sys
 from dataclasses import dataclass
-from json import load as j_load
-from json.decoder import JSONDecodeError
+import json
 from random import choice
 from time import localtime, sleep, strftime, time
 from traceback import format_tb
@@ -69,11 +68,10 @@ class Payload:
     def __repr__(self):
         return repr(str(self.__dict__))
 
-    # Simple function to compare if 2 numbers are within 3 seconds of them.
-    # Sometimes the start/end times can be a second or two off and we don't want to update because of that
+    # Check if before and after times are within a certain range.
     def compare_times(self, a: int, b: int) -> bool:
         try:
-            if abs(a-b) < 3:
+            if abs(a-b) < 10: # Plex has very high variance. 3 seconds is good otherwise
                 return True
         except TypeError:
             return True
@@ -94,7 +92,7 @@ class Payload:
 class CustomRPC():
     def __init__(self):
         with open("config.json") as f:
-            self.config: dict = j_load(f)
+            self.config: dict = json.load(f)
 
         if __name__ == "__main__":
             signal.signal(signal.SIGINT, self.close)
@@ -106,7 +104,6 @@ class CustomRPC():
         self.log = logging.getLogger("customrpc")
         self.log.setLevel(self.log_level)
 
-        # When logging to files only log warnings, log is cleared on every restart
         fhandler = logging.FileHandler(
             filename="rpc.log", encoding="utf-8", mode="a+")
         fhandler.setLevel(logging.WARNING)
@@ -119,6 +116,7 @@ class CustomRPC():
         chandler.setFormatter(self.format)
         self.log.addHandler(chandler)
 
+        # WebNowPlaying Init
         WNPRedux.Initialize(1824, "1.1.1", self.log)
 
         self.prev_cid = None  # The last client ID used for connecting. Used for comparasions
@@ -226,10 +224,12 @@ class CustomRPC():
             processes: dict[str, dict[str, Union[Process, dict]]] = {p.name(): {"object": p, "info": self.config["games"].get(
                 p.name().lower(), None)} for p in process_iter() if p.name().lower() in games}
 
-        ### VLC ###
 
         if self.config["show_other_media"]:
             # Check if VLC is in the running processes list.
+
+            ### VLC ###
+
             if process := processes.get("vlc.exe"):
                 process_info = process["info"]
                 try:  # If VLC is running, make a request to it's API to fetch what if currently playing. If it fails, just ignore and move on. It does fail alot
@@ -337,9 +337,9 @@ class CustomRPC():
                                 pass
 
                     if self.config["use_time_left_media"]:
-                        payload.end = int(time() + (WNPRedux.mediaInfo.DurationSeconds - WNPRedux.mediaInfo.DurationSeconds))
+                        payload.end = int(time() + (WNPRedux.mediaInfo.PositionSeconds - WNPRedux.mediaInfo.PositionSeconds))
                     else:
-                        payload.start = int(time() - WNPRedux.mediaInfo.DurationSeconds)
+                        payload.start = int(time() - WNPRedux.mediaInfo.PositionSeconds)
 
         ### GAMES ###
         
@@ -404,7 +404,7 @@ class CustomRPC():
         # Check if payloads are the same, and if not, push and update
         if not self.same_payload(payload) or self.last_update+300 < time():
             self.previous_payload = payload
-            self.log.debug(f"Setting presence with payload {payload}")
+            self.log.debug(f"Setting presence with payload {json.dumps(payload.to_dict(), indent=4)}")
             if client_id != NoRPC:
                 while True:
                     try:
@@ -430,8 +430,8 @@ class CustomRPC():
         try:
             # Reread the config file to see if it has been updated, ignore if errors
             with open("config.json") as f:
-                self.config = j_load(f)
-        except (JSONDecodeError, FileNotFoundError) as e:
+                self.config = json.load(f)
+        except (json.decoder.JSONDecodeError, FileNotFoundError) as e:
             self.log.warning(f"Error reading config file {e}")
 
     # Properly shutdown the rich presence, disconnecting cleanly. Not sure if this even works
