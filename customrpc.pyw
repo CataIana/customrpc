@@ -285,24 +285,30 @@ class CustomRPC():
                         try:
                             plex_xml = self.xml_parser.parse(r.text)
                             if int(plex_xml["MediaContainer"]["@size"]) > 0:
-                                p = plex_xml["MediaContainer"]["Video"]
-                                if p["Player"]["@state"] == "playing":
-                                    # If an episode, show the season and episode along with show name
-                                    # Ensure that the name doesn't hit the character limit, limiting it to 112 characters
-                                    if p["@type"] == "episode":
-                                        payload.state = f"{p['@grandparentTitle'][:104]} S{p['@parentIndex']} E{p['@index']}"
-                                    elif p["@type"] == "movie":  # Otherwise, just show the movie name
-                                        payload.state = f"{p['@title']}"[:112]
-                                    # Set unix time of start/end time
-                                    if self.config["use_time_left_media"] == True:
-                                        payload.end = int(
-                                            time() + (int(p["@duration"])/1000 - (int(p["@viewOffset"])/1000)))
-                                    else:
-                                        payload.start = int(
-                                            time() - (int(p["@viewOffset"])/1000))
-                                    # And finally set small icon and client ID, since we know everything else worked
-                                    payload.small_image = self.config["plex_icon"]
-                                    client_id = self.config["plex_cid"]
+                                if type(plex_xml["MediaContainer"]["Video"]) == list:
+                                    for i, stream in enumerate(plex_xml["MediaContainer"]["Video"], 0):
+                                        if stream["User"]["@title"] == self.config["plex_user"]:
+                                            p = plex_xml["MediaContainer"]["Video"][i]
+                                else:
+                                    p = plex_xml["MediaContainer"]["Video"]
+                                if p:
+                                    if p["Player"]["@state"] == "playing":
+                                        # If an episode, show the season and episode along with show name
+                                        # Ensure that the name doesn't hit the character limit, limiting it to 112 characters
+                                        if p["@type"] == "episode":
+                                            payload.state = f"{p['@grandparentTitle'][:104]} S{p['@parentIndex']} E{p['@index']}"
+                                        elif p["@type"] == "movie":  # Otherwise, just show the movie name
+                                            payload.state = f"{p['@title']}"[:112]
+                                        # Set unix time of start/end time
+                                        if self.config["use_time_left_media"] == True:
+                                            payload.end = int(
+                                                time() + (int(p["@duration"])/1000 - (int(p["@viewOffset"])/1000)))
+                                        else:
+                                            payload.start = int(
+                                                time() - (int(p["@viewOffset"])/1000))
+                                        # And finally set small icon and client ID, since we know everything else worked
+                                        payload.small_image = self.config["plex_icon"]
+                                        client_id = self.config["plex_cid"]
                         except KeyError as e:
                             self.log.error(self.get_traceback(e))
                     elif r.status_code == 401:
