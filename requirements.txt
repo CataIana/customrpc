@@ -1,6 +1,6 @@
 pypresence
 psutil
 spotipy
-xml_to_dict
+xmltodict
 pywnp
 requests

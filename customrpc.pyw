@@ -1,21 +1,22 @@
+import json
 import logging
 import signal
 import sys
 from dataclasses import dataclass
-import json
+from logging.handlers import RotatingFileHandler
 from random import choice
 from time import localtime, sleep, strftime, time
 from traceback import format_tb
 from typing import Optional, Union
 
-from psutil import boot_time, process_iter, Process
+from psutil import Process, boot_time, process_iter
 from pypresence import Presence
 from pypresence.exceptions import (DiscordError, DiscordNotFound, InvalidID,
                                    InvalidPipe)
 from pywnp import WNPRedux
 from requests import ConnectionError, ConnectTimeout, get
 from spotipy import Spotify, SpotifyException, SpotifyOAuth
-from xml_to_dict import XMLtoDict
+import xmltodict
 
 # This class is just intended to be something that more or less mimics None without it actually being a nonetype
 # It's used as a fill in for when a Client ID is not provided for an application
@@ -104,11 +105,16 @@ class CustomRPC():
         self.log = logging.getLogger("customrpc")
         self.log.setLevel(self.log_level)
 
-        fhandler = logging.FileHandler(
-            filename="rpc.log", encoding="utf-8", mode="a+")
-        fhandler.setLevel(logging.WARNING)
-        fhandler.setFormatter(self.format)
-        self.log.addHandler(fhandler)
+        fhandler_rotating = RotatingFileHandler("rpc.log", mode="a+", maxBytes=5*1024*1024, backupCount=0, encoding="utf-8", delay=0)
+        fhandler_rotating.setLevel(logging.WARNING)
+        fhandler_rotating.setFormatter(self.format)
+        self.log.addHandler(fhandler_rotating)
+
+        # fhandler = logging.FileHandler(
+        #     filename="rpc.log", encoding="utf-8", mode="a+")
+        # fhandler.setLevel(logging.WARNING)
+        # fhandler.setFormatter(self.format)
+        # self.log.addHandler(fhandler)
 
         # Ensure logging is also done to console
         chandler = logging.StreamHandler(sys.stdout)
@@ -129,7 +135,7 @@ class CustomRPC():
         self.last_update = 0
         # Authorize spotify, so we can connect and pull data.
         self.auth_spotify()
-        self.xml_parser = XMLtoDict()  # Used for parsing VLC and Plex data, since they reply in XML
+        self.vid_is_public: dict[str, bool] = {}
 
     def auth_spotify(self):
         self.log.debug("Authorising Spotify")
@@ -241,7 +247,7 @@ class CustomRPC():
                 else:
                     try:
                         # Use the xml parser to parse the mess of response that VLC gives us
-                        p = self.xml_parser.parse(r.text)["root"]
+                        p = xmltodict.parse(r.text)["root"]
                         if p["state"] == "playing":
                             vlctitle = None
                             vlcartist = None
@@ -283,7 +289,7 @@ class CustomRPC():
                 else:
                     if r.status_code == 200:
                         try:
-                            plex_xml = self.xml_parser.parse(r.text)
+                            plex_xml = xmltodict.parse(r.text)
                             if int(plex_xml["MediaContainer"]["@size"]) > 0:
                                 if type(plex_xml["MediaContainer"]["Video"]) == list:
                                     for i, stream in enumerate(plex_xml["MediaContainer"]["Video"], 0):
@@ -320,32 +326,57 @@ class CustomRPC():
                 # Check if the player type is defined in the config, so we use their custom client ids/etc
                 if WNPRedux.mediaInfo.Player.lower() in self.config["other_media"].keys():
                     client_id = self.config["other_media"][WNPRedux.mediaInfo.Player.lower()]["client_id"]
-                    # Run some weird maths to cut off the title if it is too long, while ensuring the artist length won't make it too long
-                    if len(f"{WNPRedux.mediaInfo.Title} - {WNPRedux.mediaInfo.Artist}") > 128:
-                        payload.state = f"{WNPRedux.mediaInfo.Title[:-(len(WNPRedux.mediaInfo.Artist)-(128-len(WNPRedux.mediaInfo.Artist)-3))]}... - {WNPRedux.mediaInfo.Artist}"
+                    if WNPRedux.mediaInfo.Player.lower() == "youtube":
+                        try:
+                            video_id = WNPRedux.mediaInfo.CoverUrl.split("/")[-2]
+                            if self.vid_is_public.get(video_id) == None:
+                                try:
+                                    response = get(f"https://www.googleapis.com/youtube/v3/videos?id={video_id}&part=status&key={self.config['yt_api_key']}")
+                                    video = response.json()["items"][0]
+                                    is_public = True if video["status"]["privacyStatus"] == "public" else False
+                                    self.vid_is_public[video_id] = is_public
+                                except KeyError:
+                                    is_public = False
+                            else:
+                                is_public = self.vid_is_public[video_id]
+                        except IndexError:
+                            is_public = False
+                        if is_public:
+                            skip = False
+                        else:
+                            skip = True
                     else:
-                        payload.state = f"{WNPRedux.mediaInfo.Title} - {WNPRedux.mediaInfo.Artist}"
-                    # Set the small image defined for the player
-                    payload.small_image = self.config["other_media"][WNPRedux.mediaInfo.Player.lower()]["icon"]
-                    # Check is player is twitch, giving a button for other people to click on to join the stream
-                    if WNPRedux.mediaInfo.Player == "Twitch":
-                        media_button = {
-                            "label": "Watch on Twitch", "url": f"https://twitch.tv/{WNPRedux.mediaInfo.Artist.lower()}"}
-                        payload.state = f"Watching {WNPRedux.mediaInfo.Artist} on Twitch"
-                    # For youtube, parse the cover url to get the video id, and add a button to watch the video
-                    elif WNPRedux.mediaInfo.Player == "Youtube":
-                        if WNPRedux.mediaInfo.CoverUrl != "":
-                            try:
-                                video_id = WNPRedux.mediaInfo.CoverUrl.split("/")[-2]
-                                media_button = {
-                                    "label": "Watch on Youtube", "url": f"https://youtube.com/watch?v={video_id}"}
-                            except IndexError:
-                                pass
+                        skip = False
 
-                    if self.config["use_time_left_media"]:
-                        payload.end = int(time() + (WNPRedux.mediaInfo.PositionSeconds - WNPRedux.mediaInfo.PositionSeconds))
+                    if not skip:
+                        # Run some weird maths to cut off the title if it is too long, while ensuring the artist length won't make it too long
+                        if len(f"{WNPRedux.mediaInfo.Title} - {WNPRedux.mediaInfo.Artist}") > 128:
+                            payload.state = f"{WNPRedux.mediaInfo.Title[:-(len(WNPRedux.mediaInfo.Artist)-(128-len(WNPRedux.mediaInfo.Artist)-3))]}... - {WNPRedux.mediaInfo.Artist}"
+                        else:
+                            payload.state = f"{WNPRedux.mediaInfo.Title} - {WNPRedux.mediaInfo.Artist}"
+                        # Set the small image defined for the player
+                        payload.small_image = self.config["other_media"][WNPRedux.mediaInfo.Player.lower()]["icon"]
+                        # Check is player is twitch, giving a button for other people to click on to join the stream
+                        if WNPRedux.mediaInfo.Player == "Twitch":
+                            media_button = {
+                                "label": "Watch on Twitch", "url": f"https://twitch.tv/{WNPRedux.mediaInfo.Artist.lower()}"}
+                            payload.state = f"Watching {WNPRedux.mediaInfo.Artist} on Twitch"
+                        # For youtube, parse the cover url to get the video id, and add a button to watch the video
+                        elif WNPRedux.mediaInfo.Player.lower() == "youtube":
+                            if WNPRedux.mediaInfo.CoverUrl != "":
+                                try:
+                                    video_id = WNPRedux.mediaInfo.CoverUrl.split("/")[-2]
+                                    media_button = {
+                                        "label": "Watch on Youtube", "url": f"https://youtube.com/watch?v={video_id}"}
+                                except (IndexError, KeyError):
+                                    pass
+
+                        if self.config["use_time_left_media"]:
+                            payload.end = int(time() + (WNPRedux.mediaInfo.PositionSeconds - WNPRedux.mediaInfo.PositionSeconds))
+                        else:
+                            payload.start = int(time() - WNPRedux.mediaInfo.PositionSeconds)
                     else:
-                        payload.start = int(time() - WNPRedux.mediaInfo.PositionSeconds)
+                        self.log.info(f"Not including YouTube video {video_id} as video is not public")
 
         ### GAMES ###
         
